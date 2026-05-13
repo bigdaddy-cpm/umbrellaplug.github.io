@@ -396,6 +396,10 @@ class Sources:
 			del window
 			if action == 'play_Item':
 				return self.playItem(title, items, chosen_source.getProperty('umbrella.source_dict'), self.meta)
+			elif action == 'play_EN_Seekable':
+				from resources.lib.modules import player
+				player.Player().play(chosen_source)
+				return
 			else:
 				homeWindow.clearProperty('umbrella.window_keep_alive')
 				try: self.window.close()
@@ -779,7 +783,21 @@ class Sources:
 					line2 = string1 % round(time() - start_time, 1)
 					if len(info) > 6: line3 = string3 % str(len(info))
 					elif len(info) > 0: line3 = string3 % (', '.join(info))
-					else: break
+					else:
+						source_4k = len([e for e in self.scraper_sources if e['quality'] == '4K'])
+						source_1080 = len([e for e in self.scraper_sources if e['quality'] == '1080p'])
+						source_720 = len([e for e in self.scraper_sources if e['quality'] == '720p'])
+						source_sd = len([e for e in self.scraper_sources if e['quality'] in ('SD', 'SCR', 'CAM')])
+						source_4k_label = total_format2 % source_4k if source_4k == 0 else total_format % (sdc, source_4k)
+						source_1080_label = total_format2 % source_1080 if source_1080 == 0 else total_format % (sdc, source_1080)
+						source_720_label = total_format2 % source_720 if source_720 == 0 else total_format % (sdc, source_720)
+						source_sd_label = total_format2 % source_sd if source_sd == 0 else total_format % (sdc, source_sd)
+						line1 = pdiag_format % (source_4k_label, source_1080_label, source_720_label, source_sd_label)
+						if progressDialog != control.progressDialog and progressDialog != control.progressDialogBG:
+							progressDialog.update(100, line1 + '[CR]' + line2 + '[CR]' + '')
+						elif progressDialog != control.progressDialogBG:
+							progressDialog.update(100, line1 + '[CR]' + line2 + '[CR]' + '')
+						break
 					current_time = time()
 					current_progress = current_time - start_time
 					#percent = int((current_progress / float(timeout)) * 100)
@@ -1431,6 +1449,17 @@ class Sources:
 							return url
 						except: pass
 					else:
+						if item.get('provider') == 'easynews':
+							try:
+								from resources.lib.debrid.easynews import EasyNews
+								base_url = url.split('|')[0]
+								resolved = EasyNews().unrestrict_link(base_url)
+								if resolved:
+									if getSetting('easynews.seekable') != 'true':
+										resolved += '|seekable=0'
+									self.url = resolved
+									return resolved
+							except: log_utils.error()
 						self.url = url
 						return url
 				else: # hosters
