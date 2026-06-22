@@ -60,7 +60,7 @@ class Episodes:
 		self.mdblist_progressFlatten = getSetting('mdblist.progressFlatten') == 'true'
 		self.trakt_link = 'https://api.trakt.tv'
 		self.trakthistory_link = 'https://api.trakt.tv/users/me/history/shows?limit=%s&page=1' % self.count
-		self.progress_link = 'https://api.trakt.tv/users/me/watched/shows?limit=1000'
+		self.progress_link = 'https://api.trakt.tv/users/me/watched/shows'
 		self.mycalendarRecent_link = 'https://api.trakt.tv/calendars/my/shows/date[30]/33/'
 		self.mycalendarUpcoming_link = 'https://api.trakt.tv/calendars/my/shows/date[0]/33/'
 		self.mycalendarPremiers_link = 'https://api.trakt.tv/calendars/my/shows/premieres/date[0]/33'
@@ -126,6 +126,13 @@ class Episodes:
 						self.list = cache.get(self.tmdb_list, 3, tvshowtitle, imdb, tmdb, tvdb, meta, season)
 				num = [x for x, y in enumerate(self.list) if y['season'] == int(season) and y['episode'] == int(episode)][-1]
 				self.list = [y for x, y in enumerate(self.list) if x >= num]
+				try:
+					from resources.lib.modules.playcount import getTVShowIndicators, getEpisodeOverlay
+					_progress_ind = getTVShowIndicators()
+					if _progress_ind:
+						while self.list and getEpisodeOverlay(_progress_ind, self.list[0].get('imdb', ''), str(self.list[0].get('tvdb', '')), self.list[0].get('season', 0), self.list[0].get('episode', 0)) == '5':
+							self.list = self.list[1:]
+				except: pass
 				if self.trakt_progressFlatten or self.mdblist_progressFlatten:
 					all_episodes = []
 
@@ -235,6 +242,16 @@ class Episodes:
 				self.list = cache.get(self.trakt_episodes_list, self.trakt_unfinished_hours, cache_key, self.trakt_user, self.lang, items)
 			if self.list is None: self.list = []
 			self.list = sorted(self.list, key=lambda k: k['paused_at'], reverse=True)
+			try:
+				dropped = mdbsync.fetch_dropped('shows_dropped')
+				if dropped:
+					dropped_tmdb = {str(i['tmdb']) for i in dropped if i.get('tmdb')}
+					dropped_imdb = {str(i['imdb']) for i in dropped if i.get('imdb')}
+					self.list = [i for i in self.list if not (
+						(i.get('tmdb') and str(i['tmdb']) in dropped_tmdb) or
+						(i.get('imdb') and str(i['imdb']) in dropped_imdb)
+					)]
+			except: pass
 			if self.list and not self.showunaired:
 				self.list = [i for i in self.list if i.get('unaired', '') != 'true']
 			if create_directory: self.episodeDirectory(self.list, unfinished=True, next=False, folderName=folderName)
@@ -242,6 +259,96 @@ class Episodes:
 		except:
 			from resources.lib.modules import log_utils
 			log_utils.error()
+
+	def local_finish_watching(self, url='', folderName=''):
+		self.list = []
+		try:
+			from resources.lib.database import watchedcache as wc
+			import datetime as _dt
+			items = wc.get_episodes_in_progress()
+			if not items:
+				control.hide()
+				if self.notifications: control.notification(title=32326, message=33049)
+				return
+
+			def build_item(item):
+				imdb_id = item.get('imdb_id', '')
+				tmdb_id = item.get('tmdb_id', '')
+				season = int(item.get('season', 0))
+				episode_num = int(item.get('episode', 0))
+				try:
+					ts = int(item.get('last_played', 0))
+					dt = _dt.datetime.utcfromtimestamp(ts)
+					lp = dt.strftime('%Y-%m-%dT%H:%M:%S.000Z')
+				except:
+					lp = ''
+				try:
+					tvdb_id = ''
+					if not tmdb_id and imdb_id:
+						tmdb_result = cache.get(tmdb_indexer().IdLookup, 96, imdb_id, '')
+						tmdb_id = str(tmdb_result.get('id')) if tmdb_result else ''
+						tvdb_id = str(tmdb_result.get('tvdb', '')) if tmdb_result else ''
+					if not tmdb_id:
+						return
+					showSeasons = cache.get(tmdb_indexer().get_showSeasons_meta, 96, tmdb_id)
+					if not showSeasons:
+						return
+					seasonEpisodes = cache.get(tmdb_indexer().get_seasonEpisodes_meta, 96, tmdb_id, season)
+					if not seasonEpisodes:
+						return
+					episode_list = seasonEpisodes.get('episodes', [])
+					try:
+						episode_meta = [x for x in episode_list if x.get('episode') == episode_num][0]
+					except:
+						return
+					values = {}
+					values['imdb'] = imdb_id
+					values['tmdb'] = tmdb_id
+					values['tvdb'] = tvdb_id or showSeasons.get('tvdb', '')
+					values['lastplayed'] = lp
+					values['paused_at'] = lp
+					values['progress'] = item.get('resume_point', '0')
+					if not episode_meta.get('plot'):
+						episode_meta['plot'] = showSeasons.get('plot', '')
+					values.update(showSeasons)
+					values.update(seasonEpisodes)
+					values.update(episode_meta)
+					for k in ('episodes', 'snum', 'enum'):
+						values.pop(k, None)
+					if not values.get('season'):
+						values['season'] = season
+					if not values.get('episode'):
+						values['episode'] = episode_num
+					if self.enable_fanarttv:
+						tvdb = values.get('tvdb', '')
+						extended_art = fanarttv_cache.get(FanartTv().get_tvshow_art, 336, tvdb)
+						if extended_art:
+							values.update(extended_art)
+					values['next'] = ''
+					values['localProgress'] = True
+					self.list.append(values)
+				except:
+					from resources.lib.modules import log_utils
+					log_utils.error()
+
+			threads = []
+			for item in items:
+				threads.append(Thread(target=build_item, args=(item,)))
+			[t.start() for t in threads]
+			[t.join() for t in threads]
+			if self.list is None:
+				self.list = []
+			self.list = sorted(self.list, key=lambda k: k.get('paused_at', ''), reverse=True)
+			for i in range(len(self.list)):
+				self.list[i]['next'] = ''
+			self.episodeDirectory(self.list, unfinished=True, next=False, folderName=folderName)
+		except:
+			from resources.lib.modules import log_utils
+			log_utils.error()
+			if not self.list:
+				control.hide()
+				if self.notifications:
+					control.notification(title=32326, message=33049)
 
 	def unfinishedManager(self):
 		try:
@@ -472,6 +579,17 @@ class Episodes:
 			sorted_list.extend(top_items)
 			sorted_list.extend([i for i in self.list if i not in top_items])
 			self.list = sorted_list
+			try:
+				from resources.lib.database import mdbsync as _mdbsync
+				dropped = _mdbsync.fetch_dropped('shows_dropped')
+				if dropped:
+					dropped_tmdb = {str(i['tmdb']) for i in dropped if i.get('tmdb')}
+					dropped_imdb = {str(i['imdb']) for i in dropped if i.get('imdb')}
+					self.list = [i for i in self.list if not (
+						(i.get('tmdb') and str(i['tmdb']) in dropped_tmdb) or
+						(i.get('imdb') and str(i['imdb']) in dropped_imdb)
+					)]
+			except: pass
 			if self.list is None: self.list = []
 			if not self.progress_showunairedMDBList:
 				self.list = [i for i in self.list if i.get('unaired', '') != 'true']
@@ -825,9 +943,12 @@ class Episodes:
 		#https://api.trakt.tv/users/me/watched/shows?extended=full
 
 		try:
-			url += ('&' if '?' in url else '?') + 'extended=full'
-			result = trakt.getTrakt(url).json()
+			url += ('&' if '?' in url else '?') + 'extended=progress'
+			result = trakt.get_all_pages(url)
+			if not result: return
 		except: return
+		from resources.lib.modules import log_utils as _trakt_log
+		_trakt_log.log('TRAKT: trakt_progress_list fetched %d shows' % len(result), level=_trakt_log.LOGDEBUG)
 		items = []
 		# progress_showunaired = getSetting('trakt.progress.showunaired') == 'true'
 		for item in result:
@@ -836,7 +957,7 @@ class Episodes:
 				num_1 = sum(len(item['seasons'][i]['episodes']) for i in range(len(item['seasons'])) if item['seasons'][i]['number'] > 0)
 				num_2 = int(item['show'].get('aired_episodes', 0)) # trakt slow to update "aired_episodes" count on day item airs
 				values['has_next_episode'] = num_1 < num_2
-				if not upcoming and item['show']['status'].lower() == 'ended': # only chk ended cases for all watched otherwise airing today cases get dropped.
+				if not upcoming and item['show'].get('status', '').lower() == 'ended': # only chk ended cases for all watched otherwise airing today cases get dropped.
 					if num_1 >= num_2: continue
 				season_sort = sorted(item['seasons'][:], key=lambda k: k['number'], reverse=False) # trakt sometimes places season0 at end and episodes out of order. So we sort it to be sure.
 				values['snum'] = season_sort[-1]['number']
@@ -866,7 +987,7 @@ class Episodes:
 					values['airzone'] = airs.get('timezone', '')
 				except: pass
 				items.append(values)
-				
+
 			except: pass
 		def items_list(i):
 			values = i

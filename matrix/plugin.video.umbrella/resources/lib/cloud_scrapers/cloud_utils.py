@@ -50,7 +50,7 @@ def cloud_check_title(title, aliases, release_title):
 				if not clean_i:
 					match = False
 					break
-				if clean_release_title.startswith(clean_i):
+				if clean_i in clean_release_title:
 					break
 			else:
 				match = False

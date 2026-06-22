@@ -199,7 +199,7 @@ class Offcloud:
 		info = self.account_info()
 		control.setSetting('offcloud.username', info.get('user_id') or info.get('userId') or info.get('email', ''))
 		control.notification(message='Offcloud successfully authorized', icon=oc_icon)
-		control.openSettings('9.3', 'plugin.video.umbrella')
+		control.openSettings('6.3', 'plugin.video.umbrella')
 
 	def remove_auth(self):
 		try:
@@ -207,7 +207,7 @@ class Offcloud:
 			control.setSetting('offcloudtoken', '')
 			control.setSetting('offcloud.username', '')
 			control.okDialog(title='Offcloud', message=40009)
-			control.openSettings('9.3', 'plugin.video.umbrella')
+			control.openSettings('6.3', 'plugin.video.umbrella')
 		except: log_utils.error()
 
 	def account_info_to_dialog(self):

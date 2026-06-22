@@ -46,19 +46,19 @@ def router(argv2):
 		navigator.Navigator().root()
 	elif action == 'mainMenuEditor':
 		from resources.lib.menus import navigator
-		navigator.Navigator().mainMenuEditor(params.get('menu_name', 'root'))
+		navigator.Navigator(lightweight=True).mainMenuEditor(params.get('menu_name', 'root'))
 	elif action == 'movieNavigatorEditor':
 		from resources.lib.menus import navigator
-		navigator.Navigator().mainMenuEditor(params.get('menu_name', 'movies'))
+		navigator.Navigator(lightweight=True).mainMenuEditor(params.get('menu_name', 'movies'))
 	elif action == 'tvNavigatorEditor':
 		from resources.lib.menus import navigator
-		navigator.Navigator().mainMenuEditor(params.get('menu_name', 'tvshows'))
+		navigator.Navigator(lightweight=True).mainMenuEditor(params.get('menu_name', 'tvshows'))
 	elif action == 'myMoviesNavigatorEditor':
 		from resources.lib.menus import navigator
-		navigator.Navigator().mainMenuEditor(params.get('menu_name', 'mymovies'))
+		navigator.Navigator(lightweight=True).mainMenuEditor(params.get('menu_name', 'mymovies'))
 	elif action == 'myTVShowsNavigatorEditor':
 		from resources.lib.menus import navigator
-		navigator.Navigator().mainMenuEditor(params.get('menu_name', 'mytvshows'))
+		navigator.Navigator(lightweight=True).mainMenuEditor(params.get('menu_name', 'mytvshows'))
 	elif action == 'runBuiltin':
 		import xbmc
 		xbmc.executebuiltin(params.get('cmd', ''))
@@ -67,10 +67,10 @@ def router(argv2):
 		navigator.Navigator().customFolder(params.get('folder_id', ''), folderName=folderName)
 	elif action == 'customFolderManager':
 		from resources.lib.menus import navigator
-		navigator.Navigator().customFolderManager()
+		navigator.Navigator(lightweight=True).customFolderManager()
 	elif action == 'customFolderEditor':
 		from resources.lib.menus import navigator
-		navigator.Navigator().mainMenuEditor(params.get('folder_id', ''))
+		navigator.Navigator(lightweight=True).mainMenuEditor(params.get('folder_id', ''))
 	####################################################
 	#---MOVIES
 	####################################################
@@ -228,6 +228,9 @@ def router(argv2):
 	elif action == 'movies_mdblistWatchlistManager':
 		from resources.lib.menus import movies
 		movies.Movies().mdblistWatchlistManager()
+	elif action == 'movies_mdblistCollectionManager':
+		from resources.lib.menus import movies
+		movies.Movies().mdblistCollectionManager()
 	elif action == 'movies_favorites':
 		from resources.lib.modules import favourites
 		favourites.getFavouritesMoviesfromXML()
@@ -246,12 +249,24 @@ def router(argv2):
 	elif action == 'mdbUserWatchListMovies':
 		from resources.lib.menus import movies
 		movies.Movies().get_mdbuser_watchlist(url, folderName=folderName)
+	elif action == 'mdbUserCollectionMovies':
+		from resources.lib.menus import movies
+		movies.Movies().get_mdbuser_collection(url, folderName=folderName)
+	elif action == 'mdbOfficialListMovies':
+		from resources.lib.menus import movies
+		movies.Movies().getMDBOfficialLists(folderName=folderName)
 	elif action == 'mdbLikedListMovies':
 		from resources.lib.menus import movies
 		movies.Movies().getMDBLikedLists(folderName=folderName)
 	elif action == 'mdbUserWatchListTVShows':
 		from resources.lib.menus import tvshows
 		tvshows.TVshows().get_mdbuser_watchlist(url, folderName=folderName)
+	elif action == 'mdbUserCollectionTVShows':
+		from resources.lib.menus import tvshows
+		tvshows.TVshows().get_mdbuser_collection(url, folderName=folderName)
+	elif action == 'mdbOfficialListTV':
+		from resources.lib.menus import tvshows
+		tvshows.TVshows().getMDBOfficialLists(folderName=folderName)
 	elif action == 'moviesimilarFromLibrary':
 		from resources.lib.menus import movies
 		movies.Movies().similarFromLibrary(tmdb=tmdb)
@@ -408,6 +423,12 @@ def router(argv2):
 	elif action == 'shows_mdblistWatchlistManager':
 		from resources.lib.menus import tvshows
 		tvshows.TVshows().mdblistWatchlistManager()
+	elif action == 'shows_mdblistCollectionManager':
+		from resources.lib.menus import tvshows
+		tvshows.TVshows().mdblistCollectionManager()
+	elif action == 'shows_mdblistDroppedManager':
+		from resources.lib.menus import tvshows
+		tvshows.TVshows().mdblistDroppedManager()
 	elif action == 'mdbUserListTV':
 		from resources.lib.menus import tvshows
 		tvshows.TVshows().getMDBUserList(folderName=folderName)
@@ -429,6 +450,9 @@ def router(argv2):
 	elif action == 'local_shows_progress':
 		from resources.lib.menus import tvshows
 		tvshows.TVshows().local_progress(url, folderName=folderName)
+	elif action == 'local_finish_watching_movies':
+		from resources.lib.menus import movies
+		movies.Movies().local_finish_watching(url, folderName=folderName)
 
 	####################################################
 	#---Plex
@@ -516,6 +540,9 @@ def router(argv2):
 	elif action == 'local_calendar':
 		from resources.lib.menus import episodes
 		episodes.Episodes().local_calendar(url, folderName=folderName)
+	elif action == 'local_finish_watching_episodes':
+		from resources.lib.menus import episodes
+		episodes.Episodes().local_finish_watching(url, folderName=folderName)
 
 	####################################################
 	#---Premium Services
@@ -889,6 +916,18 @@ def router(argv2):
 					elif mediatype == 'webdl': url = torbox.TorBox().unrestrict_webdl(url.replace(' ', '%20'))
 					else: url = torbox.TorBox().unrestrict_link(url.replace(' ', '%20'))
 					downloader.download(name, image, torbox.TorBox().add_headers_to_url(url))
+				except:
+					import traceback
+					traceback.print_exc()
+		elif action == 'downloadPack':
+			caller = params.get('caller')
+			if caller == 'sources':
+				control.busy()
+				try:
+					from json import loads as jsloads
+					from resources.lib.modules import downloader
+					info = jsloads(source)[0]
+					downloader.download_pack(name, image, info)
 				except:
 					import traceback
 					traceback.print_exc()

@@ -19,7 +19,7 @@ decades = ['1930-1939', '1940-1949','1950-1959', '1960-1969', '1970-1979', '1980
 
 
 class Navigator:
-	def __init__(self):
+	def __init__(self, lightweight=False):
 		self.artPath = control.artPath()
 		self.iconLogos = getSetting('icon.logos') != 'Traditional'
 		self.indexLabels = getSetting('index.labels') == 'true'
@@ -40,8 +40,14 @@ class Navigator:
 		self.tmdbSessionID = getSetting('tmdb.sessionid') != ''
 		self.reuselanguageinv = getSetting('reuse.languageinvoker') == 'true'
 		self.highlight_color = getSetting('highlight.color')
-		self.hasLibMovies = len(jsloads(control.jsonrpc('{"jsonrpc": "2.0", "method": "VideoLibrary.GetMovies", "params": { "limits": { "start" : 0, "end": 1 }, "properties" : ["title", "genre", "uniqueid", "art", "rating", "thumbnail", "playcount", "file"] }, "id": "1"}'))['result']['movies']) > 0
 		self.useContainerTitles = getSetting('enable.containerTitles') == 'true'
+		if lightweight:
+			self.hasLibMovies = False
+			self.favoriteMovie = False
+			self.favoriteTVShows = False
+			self.favoriteEpisodes = False
+			return
+		self.hasLibMovies = len(jsloads(control.jsonrpc('{"jsonrpc": "2.0", "method": "VideoLibrary.GetMovies", "params": { "limits": { "start" : 0, "end": 1 }, "properties" : ["title", "genre", "uniqueid", "art", "rating", "thumbnail", "playcount", "file"] }, "id": "1"}'))['result']['movies']) > 0
 		self.favoriteMovie = favourites.checkForFavourites(content='movies')
 		self.favoriteTVShows = favourites.checkForFavourites(content='tvshows')
 		self.favoriteEpisodes = favourites.checkForFavourites(content='episode')
@@ -586,6 +592,7 @@ class Navigator:
 			self.addDirectoryItem(40670, 'mdblistRevoke', 'mdblist.png', 'DefaultAddonService.png', isFolder=False)
 		self.addDirectoryItem(40638, 'movies_mdblistWatchlistManager', 'mdblist.png', 'DefaultAddonService.png', isFolder=False)
 		self.addDirectoryItem(40639, 'shows_mdblistWatchlistManager', 'mdblist.png', 'DefaultAddonService.png', isFolder=False)
+		self.addDirectoryItem(40714, 'shows_mdblistDroppedManager', 'mdblist.png', 'DefaultAddonService.png', isFolder=False)
 		self.addDirectoryItem(40637, 'tools_forceMDBListSync', 'mdblist.png', 'DefaultAddonService.png', isFolder=False)
 		self.endDirectory()
 
@@ -672,7 +679,7 @@ class Navigator:
 			self.addDirectoryItem('All-Debrid: Transfers', 'ad_Transfers', 'alldebrid.png', 'DefaultAddonService.png')
 			self.addDirectoryItem('All-Debrid: Account Info', 'ad_AccountInfo', 'alldebrid.png', 'DefaultAddonService.png', isFolder=False)
 		else:
-			self.addDirectoryItem('[I]Please setup in Settings.[/I]', 'tools_openSettings&query=10.0', 'alldebrid.png', 'DefaultAddonService.png', isFolder=False)
+			self.addDirectoryItem('[I]Please setup in Settings.[/I]', 'tools_openSettings&query=6.1', 'alldebrid.png', 'DefaultAddonService.png', isFolder=False)
 		self.endDirectory()
 
 	def easynews_service(self, folderName=''):
@@ -681,7 +688,7 @@ class Navigator:
 			self.addDirectoryItem('Easy News: Search', 'en_Search', 'search.png', 'DefaultAddonsSearch.png')
 			self.addDirectoryItem('Easy News: Account Info', 'en_AccountInfo', 'easynews.png', 'DefaultAddonService.png', isFolder=False)
 		else:
-			self.addDirectoryItem('[I]Please setup in Settings.[/I]', 'tools_openSettings&query=10.1', 'easynews.png', 'DefaultAddonService.png', isFolder=False)
+			self.addDirectoryItem('[I]Please setup in Settings.[/I]', 'tools_openSettings&query=7.3', 'easynews.png', 'DefaultAddonService.png', isFolder=False)
 		self.endDirectory()
 
 	def offcloud_service(self):
@@ -690,7 +697,7 @@ class Navigator:
 			self.addDirectoryItem('Offcloud: Account Info', 'oc_AccountInfo', 'offcloud.png', 'DefaultAddonService.png', isFolder=False)
 			self.addDirectoryItem('Offcloud: Clear Cloud Storage', 'oc_UserCloudClear', 'offcloud.png', 'DefaultAddonService.png', isFolder=False)
 		else:
-			self.addDirectoryItem('[I]Please setup in Accounts[/I]', 'tools_openSettings&query=10.2', 'offcloud.png', 'DefaultAddonService.png', isFolder=False)
+			self.addDirectoryItem('[I]Please setup in Accounts[/I]', 'tools_openSettings&query=6.3', 'offcloud.png', 'DefaultAddonService.png', isFolder=False)
 		self.endDirectory()
 
 	def torbox_service(self):
@@ -699,7 +706,7 @@ class Navigator:
 			self.addDirectoryItem('TorBox: Account Info', 'tb_AccountInfo', 'torbox.png', 'DefaultAddonService.png', isFolder=False)
 			self.addDirectoryItem('TorBox: Delete All Cloud Files', 'tb_DeleteCloud', 'torbox.png', 'DefaultAddonService.png', isFolder=False)
 		else:
-			self.addDirectoryItem('[I]Please setup in Accounts[/I]', 'tools_openSettings&query=10.6', 'torbox.png', 'DefaultAddonService.png', isFolder=False)
+			self.addDirectoryItem('[I]Please setup in Accounts[/I]', 'tools_openSettings&query=6.6', 'torbox.png', 'DefaultAddonService.png', isFolder=False)
 		self.endDirectory()
 
 	def premiumize_service(self, folderName=''):
@@ -709,7 +716,7 @@ class Navigator:
 			self.addDirectoryItem('Premiumize: Transfers', 'pm_Transfers', 'premiumize.png', 'DefaultAddonService.png')
 			self.addDirectoryItem('Premiumize: Account Info', 'pm_AccountInfo', 'premiumize.png', 'DefaultAddonService.png', isFolder=False)
 		else:
-			self.addDirectoryItem('[I]Please setup in Settings.[/I]', 'tools_openSettings&query=10.4', 'premiumize.png', 'DefaultAddonService.png', isFolder=False)
+			self.addDirectoryItem('[I]Please setup in Settings.[/I]', 'tools_openSettings&query=6.4', 'premiumize.png', 'DefaultAddonService.png', isFolder=False)
 		self.endDirectory()
 
 	def realdebrid_service(self, folderName=''):
@@ -719,7 +726,7 @@ class Navigator:
 			self.addDirectoryItem('Real-Debrid: My Downloads', 'rd_MyDownloads&query=1', 'realdebrid.png', 'DefaultAddonService.png')
 			self.addDirectoryItem('Real-Debrid: Account Info', 'rd_AccountInfo', 'realdebrid.png', 'DefaultAddonService.png', isFolder=False )
 		else:
-			self.addDirectoryItem('[I]Please setup in Settings.[/I]', 'tools_openSettings&query=10.5', 'realdebrid.png', 'DefaultAddonService.png', isFolder=False)
+			self.addDirectoryItem('[I]Please setup in Settings.[/I]', 'tools_openSettings&query=6.5', 'realdebrid.png', 'DefaultAddonService.png', isFolder=False)
 		self.endDirectory()
 
 	def search(self, folderName=''):

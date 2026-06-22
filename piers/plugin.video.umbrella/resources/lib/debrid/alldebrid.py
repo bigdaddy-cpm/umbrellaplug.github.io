@@ -150,13 +150,13 @@ class AllDebrid:
 			self.auth_loop()
 		if self.token in (None, '', 'failed'):
 			if fromSettings == 1:
-				control.openSettings('9.0', 'plugin.video.umbrella')
+				control.openSettings('6.0', 'plugin.video.umbrella')
 			return
 		control.sleep(2000)
 		account_info = self._get('user')
 		control.setSetting('alldebridusername', str(account_info['user']['username']))
 		if fromSettings == 1:
-			control.openSettings('9.0', 'plugin.video.umbrella')
+			control.openSettings('6.0', 'plugin.video.umbrella')
 		control.notification(message=40010, icon=ad_icon)
 		log_utils.log(40010, __name__, log_utils.LOGWARNING)
 
@@ -165,7 +165,7 @@ class AllDebrid:
 			control.setSetting('alldebridtoken', '')
 			control.setSetting('alldebridusername', '')
 			if fromSettings == 1:
-				control.openSettings('9.0', 'plugin.video.umbrella')
+				control.openSettings('6.0', 'plugin.video.umbrella')
 			control.okDialog(title=40059, message=40009)
 		except: log_utils.error()
 

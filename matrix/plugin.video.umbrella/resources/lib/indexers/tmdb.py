@@ -276,16 +276,19 @@ class Movies(TMDb):
 		except: return
 		self.list = []
 		try:
+			from urllib.parse import urlsplit, parse_qsl, urlencode, urlunsplit
 			page = int(result['page'])
 			total = int(result['total_pages'])
 			if page >= total: raise Exception()
-			if 'page=' not in fetch_url: raise Exception()
-			next = '%s&page=%s' % (fetch_url.split('&page=', 1)[0], page+1)
+			parsed = urlsplit(fetch_url)
+			qs = [(k, v) for k, v in parse_qsl(parsed.query) if k != 'page']
+			qs.append(('page', str(page + 1)))
+			next = urlunsplit(parsed._replace(query=urlencode(qs)))
 		except: next = ''
 		for item in items:
 			try:
 				values = {}
-				values['next'] = next 
+				values['next'] = next
 				media_type = item.get('media_type')
 				if media_type == 'tv': continue
 				values['tmdb'] = str(item.get('id', '')) if item.get('id') else ''
@@ -714,16 +717,19 @@ class TVshows(TMDb):
 		except: return
 		self.list = []
 		try:
+			from urllib.parse import urlsplit, parse_qsl, urlencode, urlunsplit
 			page = int(result['page'])
 			total = int(result['total_pages'])
 			if page >= total: raise Exception()
-			if 'page=' not in url: raise Exception()
-			next = '%s&page=%s' % (url.split('&page=', 1)[0], page+1)
+			parsed = urlsplit(url)
+			qs = [(k, v) for k, v in parse_qsl(parsed.query) if k != 'page']
+			qs.append(('page', str(page + 1)))
+			next = urlunsplit(parsed._replace(query=urlencode(qs)))
 		except: next = ''
 		for item in items:
 			try:
 				values = {}
-				values['next'] = next 
+				values['next'] = next
 				media_type = item.get('media_type', '')
 				if media_type == 'movie': continue
 				values['tmdb'] = str(item.get('id', '')) if item.get('id') else ''
@@ -1370,7 +1376,7 @@ class Auth:
 			from resources.lib.modules.control import setSetting
 			if getSetting('tmdbusername') == '' or getSetting('tmdbpassword') == '':
 				if fromSettings == 1:
-						openSettings('11.2', 'plugin.video.umbrella')
+						openSettings('8.2', 'plugin.video.umbrella')
 				return notification(message='TMDb Account info missing', icon='ERROR')
 			url = self.auth_base_link + '/token/new?api_key=%s' % self.API_key
 			result = requests.get(url).json()
@@ -1393,14 +1399,14 @@ class Auth:
 						setSetting('tmdb.sessionid', session_id)
 						notification(message='TMDb Successfully Authorized')
 						if fromSettings == 1:
-							openSettings('11.2', 'plugin.video.umbrella')
+							openSettings('8.2', 'plugin.video.umbrella')
 					else: 
 						notification(message='TMDb Authorization Cancelled')
 						if fromSettings == 1:
-							openSettings('11.2', 'plugin.video.umbrella')
+							openSettings('8.2', 'plugin.video.umbrella')
 			else:
 				if fromSettings == 1:
-						openSettings('11.2', 'plugin.video.umbrella')
+						openSettings('8.2', 'plugin.video.umbrella')
 				return notification(message='Please check TMDB Account Info and Password.', icon='ERROR')
 		except:
 			from resources.lib.modules import log_utils
@@ -1417,7 +1423,7 @@ class Auth:
 				setSetting('tmdb.sessionid', '')
 				notification(message='TMDb session_id successfully deleted')
 				if fromSettings == 1:
-					openSettings('11.2', 'plugin.video.umbrella')
+					openSettings('8.2', 'plugin.video.umbrella')
 			else:
 				from resources.lib.modules import log_utils
 				log_utils.log('TMDb Revoke session_id FAILED: %s' % result.get('status_message', ''), __name__, log_utils.LOGWARNING)
@@ -1425,10 +1431,10 @@ class Auth:
 					setSetting('tmdb.sessionid', '')
 					notification(message=result.get('status_message', ''), icon='ERROR')
 					if fromSettings == 1:
-						openSettings('11.2', 'plugin.video.umbrella')
+						openSettings('8.2', 'plugin.video.umbrella')
 				else:
 					if fromSettings == 1:
-						openSettings('11.2', 'plugin.video.umbrella')
+						openSettings('8.2', 'plugin.video.umbrella')
 					notification(message='TMDb session_id deletion FAILED', icon='ERROR')
 		except:
 			from resources.lib.modules import log_utils

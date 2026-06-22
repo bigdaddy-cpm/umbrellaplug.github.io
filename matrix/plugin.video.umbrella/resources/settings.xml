@@ -2687,6 +2687,11 @@
 					<default>false</default>
 					<control type="toggle"/>
 				</setting>
+				<setting id="cloud.sources.first" type="boolean" label="40705" help="">
+					<level>0</level>
+					<default>false</default>
+					<control type="toggle"/>
+				</setting>
 				<setting id="uncached.seeder.sort" type="boolean" label="32213" help="">
 					<level>0</level>
 					<default>false</default>
@@ -4608,6 +4613,14 @@
 					</dependencies>
 					<control type="toggle"/>
 				</setting>
+				<setting id="tbReferralButton" type="action" label="40671" help="">
+					<level>0</level>
+					<data>RunPlugin(plugin://plugin.video.umbrella/?action=tb_ReferralLink)</data>
+					<constraints>
+						<allowempty>true</allowempty>
+					</constraints>
+					<control type="button" format="action"/>
+				</setting>
 				<setting id="tbAuthorizeButton" type="action" label="40121" help="">
 					<level>0</level>
 					<data>RunPlugin(plugin://plugin.video.umbrella/?action=tb_Authorize)</data>
@@ -5300,6 +5313,16 @@
 					<control type="button" format="action">
 						<close>true</close>
 					</control>
+				</setting>
+				<setting id="tmdb.paginate.lists" type="boolean" label="32188" help="">
+					<level>0</level>
+					<default>true</default>
+					<dependencies>
+						<dependency type="visible">
+							<condition operator="!is" setting="tmdb.v4.accesstoken"></condition>
+						</dependency>
+					</dependencies>
+					<control type="toggle"/>
 				</setting>
 			</group>
 		</category>

@@ -3,7 +3,7 @@
 	Umbrella Add-on
 """
 
-from json import dumps as jsdumps
+from json import dumps as jsdumps, loads as jsloads
 from urllib.parse import quote_plus
 from resources.lib.modules.control import joinPath, transPath, dialog, notification, addonFanart, setting as getSetting, getProviderColors
 from resources.lib.modules import tools
@@ -101,6 +101,11 @@ class SourceResultsXML(BaseDialog):
 				if not 'UNCACHED' in source and self.dnlds_enabled:
 					cm_list += [('[B]Download[/B]', 'download')]
 					cm_list += [('[B]Create Strm File[/B]', 'strmFile')]
+					try:
+						_src_info = jsloads(source_dict)
+						if _src_info and _src_info[0].get('package') in ('season', 'show') and 'magnet:' in _src_info[0].get('url', ''):
+							cm_list += [('[B]Download Pack[/B]', 'downloadPack')]
+					except: pass
 				debrid = chosen_source.getProperty('umbrella.debrid')
 				if (re_match(r'^CACHED.*TORRENT', source) or 'unchecked' in source_dict) and debrid != 'EasyDebrid':
 					cm_list += [('[B]Save to %s Cloud[/B]' % debrid, 'saveToCloud')]
@@ -131,6 +136,19 @@ class SourceResultsXML(BaseDialog):
 					except: new_sysname = sysname
 					self.execute_code('RunPlugin(plugin://plugin.video.umbrella/?action=download&name=%s&image=%s&source=%s&caller=sources&title=%s)' %
 										(new_sysname, quote_plus(poster), quote_plus(source_dict), sysname))
+					self.selected = (None, '')
+				elif cm_action == 'downloadPack':
+					sysname = quote_plus(self.meta.get('title'))
+					poster = self.meta.get('poster', '')
+					if 'tvshowtitle' in self.meta:
+						sysname = quote_plus(self.meta.get('tvshowtitle'))
+						poster = self.meta.get('season_poster') or self.meta.get('poster')
+						if 'year' in self.meta: sysname += quote_plus(' (%s)' % self.meta['year'])
+					elif 'year' in self.meta: sysname += quote_plus(' (%s)' % self.meta['year'])
+					try: new_sysname = quote_plus(chosen_source.getProperty('umbrella.name'))
+					except: new_sysname = sysname
+					self.execute_code('RunPlugin(plugin://plugin.video.umbrella/?action=downloadPack&name=%s&image=%s&source=%s&caller=sources)' %
+										(new_sysname, quote_plus(poster), quote_plus(source_dict)))
 					self.selected = (None, '')
 				elif cm_action == 'strmFile':
 					sysname = quote_plus(self.meta.get('title'))

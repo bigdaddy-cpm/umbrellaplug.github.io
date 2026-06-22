@@ -307,7 +307,7 @@ class TorBox:
 			control.setSetting('torboxtoken', access_token)
 			control.setSetting('torbox.username', customer)
 			control.notification(message='TorBox successfully authorized', icon=tb_icon)
-			control.openSettings('9.6', 'plugin.video.umbrella')
+			control.openSettings('6.6', 'plugin.video.umbrella')
 			return True
 		except:
 			log_utils.error('TorBox auth: ')
@@ -321,14 +321,12 @@ class TorBox:
 			control.setSetting('torboxtoken', '')
 			control.setSetting('torbox.username', '')
 			control.notification(title='TorBox', message=40009, icon=tb_icon)
-			control.openSettings('9.6', 'plugin.video.umbrella')
+			control.openSettings('6.6', 'plugin.video.umbrella')
 		except: log_utils.error()
 
 	def referral_link(self):
 		highlight_color = getSetting('highlight.color')
-		referral_url = 'https://torbox.app/subscription?referral=6463de7b-29aa-4efb-bc5b-3deda767faa6'
-		token_ttl = 15
-		expiry = token_ttl
+		referral_url = 'https://torbox.app/subscription?referral=e8eb3e56-0e32-4553-91cc-c9aec3b7366e'
 		progressDialog = None
 		try:
 			if getSetting('dialogs.useumbrelladialog') == 'true':
@@ -339,13 +337,10 @@ class TorBox:
 			else:
 				progressDialog = control.progressDialog
 				progressDialog.create(getLS(40671))
-			line = '%s\n%s' % ('[COLOR %s][B]Umbrella Torbox Referral Link[/B][/COLOR]' % highlight_color, referral_url)
+			line = '%s\n%s' % ('[COLOR %s][B]Umbrella TorBox Referral Link[/B][/COLOR]' % highlight_color, referral_url)
 			progressDialog.update(0, line)
-			while token_ttl > 0 and not progressDialog.iscanceled():
-				control.sleep(1000)
-				token_ttl -= 1
-				progress_percent = int(float(expiry - token_ttl) / expiry * 100)
-				progressDialog.update(progress_percent, line)
+			while not progressDialog.iscanceled():
+				control.sleep(500)
 			progressDialog.close()
 		except:
 			log_utils.error('TorBox referral_link: ')

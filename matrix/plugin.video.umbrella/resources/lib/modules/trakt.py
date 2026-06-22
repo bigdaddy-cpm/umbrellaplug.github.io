@@ -10,7 +10,7 @@ import requests
 from requests.adapters import HTTPAdapter
 from threading import Thread, Lock
 from urllib3.util.retry import Retry
-from urllib.parse import urljoin
+from urllib.parse import urljoin, urlparse, parse_qsl, urlencode, urlunparse
 from resources.lib.database import cache, traktsync
 from resources.lib.modules import cleandate
 from resources.lib.modules import control
@@ -53,6 +53,7 @@ def getTrakt(url, post=None, extended=False, silent=False, reauth_attempts=0):
 			# avoiding stale getSetting() cache causing repeat 401s on retry.
 			current_token = control.homeWindow.getProperty(_TRAKT_TOKEN_PROP) or getSetting('trakt.user.token')
 			headers['Authorization'] = 'Bearer %s' % current_token
+		_req_start = time.time()
 		for _attempt in range(2):
 			try:
 				if post:
@@ -60,6 +61,11 @@ def getTrakt(url, post=None, extended=False, silent=False, reauth_attempts=0):
 				else:
 					response = session.get(url, headers=headers, timeout=20)
 				_last_request_time = time.time()
+				_req_elapsed = _last_request_time - _req_start
+				if _req_elapsed > 3.0:
+					log_utils.log('TRAKT: slow request (%.1fs): %s' % (_req_elapsed, url), level=log_utils.LOGWARNING)
+				elif _req_elapsed > 1.0:
+					log_utils.log('TRAKT: request took %.1fs: %s' % (_req_elapsed, url), level=log_utils.LOGDEBUG)
 				break
 			except requests.exceptions.ConnectionError:
 				if _attempt == 0 and not post:  # Only retry GETs; retrying POSTs risks double-submission to /sync/history
@@ -126,21 +132,20 @@ def getTraktAsJson(url, post=None, silent=False):
 def get_all_pages(url, silent=False):
 	"""Fetch all pages from a paginated Trakt endpoint and return combined results."""
 	try:
-		# Clean URL to ensure no existing pagination params
-		if '&page=' in url:
-			url = url.split('&page=')[0]
-		if '?page=' in url:
-			url = url.split('?page=')[0]
-		if '&limit=' in url:
-			url = url.split('&limit=')[0]
-		if '?limit=' in url:
-			url = url.split('?limit=')[0]
-		
+		# Strip page= and limit= params while preserving all other query params (e.g. extended=full)
+		try:
+			parsed = urlparse(url)
+			params = [(k, v) for k, v in parse_qsl(parsed.query) if k not in ('page', 'limit')]
+			url = urlunparse(parsed._replace(query=urlencode(params)))
+		except:
+			pass
+
 		sep = '&' if '?' in url else '?'
-		limit = 1000
+		limit = 250
 		page = 1
 		results = []
-		
+		_sync_start = time.time()
+
 		while True:
 			page_url = url + sep + 'page=%d&limit=%d' % (page, limit)
 			response = getTrakt(page_url, silent=silent)
@@ -149,18 +154,18 @@ def get_all_pages(url, silent=False):
 					log_utils.log('TRAKT: get_all_pages - No response on first page for URL: %s' % url, level=log_utils.LOGWARNING)
 					return None
 				break
-			
+
 			try:
 				page_results = response.json()
 			except Exception as e:
 				log_utils.log('TRAKT: get_all_pages - JSON decode error on page %d: %s' % (page, str(e)), level=log_utils.LOGWARNING)
 				if page == 1: return None
 				break
-			
+
 			if not page_results:
 				if page == 1: return page_results if page_results is not None else []
 				break
-			
+
 			try:
 				items_count = len(page_results)
 				results.extend(page_results)
@@ -173,7 +178,9 @@ def get_all_pages(url, silent=False):
 				log_utils.log('TRAKT: get_all_pages - Error processing page %d: %s' % (page, str(e)), level=log_utils.LOGWARNING)
 				if page == 1: return None
 				break
-			
+
+			log_utils.log('TRAKT: get_all_pages page %d: %d items from %s' % (page, items_count, url), level=log_utils.LOGDEBUG)
+
 			# If we got fewer items than the limit, we've reached the last page
 			if items_this_page < limit:
 				break
@@ -201,13 +208,13 @@ def get_all_pages(url, silent=False):
 
 			page += 1
 
-			# Safety limit to prevent infinite loops (max 100 pages = 100,000 items at limit=1000)
-			if page > 100:
-				log_utils.log('TRAKT: get_all_pages reached safety limit of 100 pages for URL: %s' % url, level=log_utils.LOGWARNING)
+			# Safety limit: 400 pages × 250 = 100,000 items max
+			if page > 400:
+				log_utils.log('TRAKT: get_all_pages reached safety limit of 400 pages for URL: %s' % url, level=log_utils.LOGWARNING)
 				break
-		
+
 		if page > 1:
-			log_utils.log('TRAKT: get_all_pages - Fetched %d items across %d pages' % (len(results), page), level=log_utils.LOGINFO)
+			log_utils.log('TRAKT: get_all_pages - Fetched %d items across %d pages in %.1fs from %s' % (len(results), page, time.time() - _sync_start, url), level=log_utils.LOGINFO)
 		
 		return results
 	except Exception as e:
@@ -308,7 +315,7 @@ def traktAuth(fromSettings=0):
 		traktDeviceCode = getTraktDeviceCode()
 		if not traktDeviceCode:
 			if fromSettings == 1:
-				control.openSettings('8.3', 'plugin.video.umbrella')
+				control.openSettings('5.3', 'plugin.video.umbrella')
 			control.notification(message=40108, icon=trakt_icon)
 			return False
 		deviceCode = getTraktDeviceToken(traktDeviceCode)
@@ -336,7 +343,7 @@ def traktAuth(fromSettings=0):
 			except: pass
 			control.notification(message=40107, icon=trakt_icon)
 			if fromSettings == 1:
-				control.openSettings('8.3', 'plugin.video.umbrella')
+				control.openSettings('5.3', 'plugin.video.umbrella')
 			if not control.yesnoDialog('Do you want to set Trakt as your service for your watched and unwatched indicators?','','','Indicators', 'No', 'Yes'): return True
 			global _reauth_failed
 			_reauth_failed = False
@@ -345,12 +352,14 @@ def traktAuth(fromSettings=0):
 			control.setSetting('indicators.alt', '1')
 			control.setSetting('scrobble.source', '1')
 			control.homeWindow.setProperty('umbrella.updateSettings', 'true')
+			control.setSetting('scrobble', 'Trakt')
 			control.setSetting('indicators', 'Trakt')
 			control.notification(message='Trakt Indicators Enabled - Syncing Watched Data...')
+			control.openSettings('5.1', 'plugin.video.umbrella')
 			Thread(target=sync_watched, kwargs={'forced': True}).start()
 			return True
 		if fromSettings == 1:
-				control.openSettings('8.3', 'plugin.video.umbrella')
+				control.openSettings('5.3', 'plugin.video.umbrella')
 		control.notification(message=40108, icon=trakt_icon)
 		return False
 	except:
@@ -389,7 +398,7 @@ def traktRevoke(fromSettings=0):
 			control.homeWindow.setProperty(_REAUTH_BUSY_PROP, '')
 			control.homeWindow.setProperty(_TRAKT_TOKEN_PROP, '')
 			if fromSettings == 1:
-				control.openSettings('8.3', 'plugin.video.umbrella')
+				control.openSettings('5.3', 'plugin.video.umbrella')
 				control.dialog.ok(control.lang(32315), control.lang(40109))
 		except:
 			log_utils.error()
@@ -869,6 +878,8 @@ def manager(name, imdb=None, tvdb=None, season=None, episode=None, refresh=True,
 				if items[select][1] == '/sync/collection/remove':
 					if media_type == 'Movie': traktsync.delete_collection_items([imdb], 'movies_collection', 'imdb')
 					else: traktsync.delete_collection_items([tvdb], 'shows_collection', 'tvdb')
+				if '/users/me/lists/' in items[select][1] and items[select][1].endswith('/remove'):
+					control.homeWindow.setProperty('umbrella.trakt.userlist.modified', 'true')
 
 				control.hide()
 				#list = re.search('\[B](.+?)\[/B]', items[select][0]).group(1)
@@ -1075,12 +1086,36 @@ def cachesyncMovies(timeout=0):
 def syncMovies():
 	try:
 		if not getTraktCredentialsInfo(): return
+		_start = time.time()
 		indicators = get_all_pages('/users/me/watched/movies')
 		if not indicators: return None
 		indicators = [i['movie']['ids'] for i in indicators]
 		indicators = [str(i['imdb']) for i in indicators if 'imdb' in i]
+		log_utils.log('TRAKT: syncMovies complete: %d movies in %.1fs' % (len(indicators), time.time() - _start), level=log_utils.LOGINFO)
 		return indicators
 	except: log_utils.error()
+
+def syncMovies_delta(last_sync_at):
+	"""Fetch movie watch events since last_sync_at. Returns new IMDb ID list, [] if none, None on error."""
+	try:
+		if not getTraktCredentialsInfo(): return None
+		from datetime import datetime as _dt
+		_start = time.time()
+		date_from = _dt.utcfromtimestamp(last_sync_at).strftime('%Y-%m-%dT%H:%M:%SZ')
+		log_utils.log('TRAKT delta: movies delta started from %s' % date_from, level=log_utils.LOGDEBUG)
+		history = get_all_pages('/users/me/history/movies?start_at=%s' % date_from)
+		if history is None: return None
+		if not history: return []
+		seen = set()
+		new_ids = []
+		for entry in history:
+			imdb = str(entry.get('movie', {}).get('ids', {}).get('imdb', ''))
+			if imdb and imdb not in seen:
+				seen.add(imdb)
+				new_ids.append(imdb)
+		log_utils.log('TRAKT delta: movies delta complete: %d new movie(s) in %.1fs' % (len(new_ids), time.time() - _start), level=log_utils.LOGINFO)
+		return new_ids
+	except: log_utils.error(); return None
 
 def timeoutsyncMovies():
 	timeout = traktsync.timeout(syncMovies)
@@ -1213,12 +1248,14 @@ def syncTVShows(): # sync all watched shows ex. [({'imdb': 'tt12571834', 'tvdb':
 		if not getTraktCredentialsInfo(): return
 		# Process page-by-page to avoid loading all raw show data into memory at once.
 		# ?extended=full is omitted — only ids/aired_episodes/seasons are used, not show metadata.
+		_start = time.time()
+		log_utils.log('TRAKT: syncTVShows started', level=log_utils.LOGDEBUG)
 		indicators = []
 		seen_ids = set()
 		page = 1
-		limit = 1000
+		limit = 250
 		while True:
-			response = getTrakt('/users/me/watched/shows?page=%d&limit=%d' % (page, limit))
+			response = getTrakt('/users/me/watched/shows?extended=progress&page=%d&limit=%d' % (page, limit))
 			if not response: break
 			try: page_results = response.json()
 			except: break
@@ -1234,10 +1271,12 @@ def syncTVShows(): # sync all watched shows ex. [({'imdb': 'tt12571834', 'tvdb':
 					episodes = {}
 					reset_at = i.get('reset_at')
 					for s in i.get('seasons', []):
-						ep_nums = sorted(e['number'] for e in s['episodes'] if reset_at is None or e['last_watched_at'] > reset_at)
+						if s.get('number', 0) == 0: continue
+						ep_nums = sorted(e['number'] for e in s['episodes'] if e.get('last_watched_at') and (reset_at is None or e['last_watched_at'] > reset_at))
 						if ep_nums: episodes[s['number']] = _make_episode_ranges(ep_nums)
 					indicators.append((ids, aired, episodes))
 				except: pass
+			log_utils.log('TRAKT: syncTVShows page %d: %d shows fetched' % (page, len(page_results)), level=log_utils.LOGDEBUG)
 			if len(page_results) < limit: break
 			if hasattr(response, 'headers'):
 				total_pages = response.headers.get('X-Pagination-Page-Count')
@@ -1251,9 +1290,60 @@ def syncTVShows(): # sync all watched shows ex. [({'imdb': 'tt12571834', 'tvdb':
 						if len(indicators) >= int(total_items): break
 					except: pass
 			page += 1
-			if page > 100: break
+			if page > 400: break
+		log_utils.log('TRAKT: syncTVShows complete: %d shows in %.1fs' % (len(indicators) if indicators else 0, time.time() - _start), level=log_utils.LOGINFO)
 		return indicators if indicators else None
 	except: log_utils.error()
+
+def syncTVShows_delta(last_sync_at, activity_at=None):
+	try:
+		if not getTraktCredentialsInfo(): return None
+		from datetime import datetime as _dt
+		_start = time.time()
+		date_from = _dt.utcfromtimestamp(last_sync_at).strftime('%Y-%m-%dT%H:%M:%SZ')
+		log_utils.log('TRAKT delta: shows delta started from %s' % date_from, level=log_utils.LOGDEBUG)
+		history = get_all_pages('/users/me/history/shows?start_at=%s' % date_from)
+		if history is None: return None
+		if not history: return []
+		if activity_at:
+			from resources.lib.modules import cleandate as _cleandate
+			history_latest = max((int(_cleandate.iso_2_utc(e.get('watched_at', ''))) for e in history if e.get('watched_at')), default=0)
+			if history_latest and activity_at > history_latest + 30:
+				log_utils.log('TRAKT delta: activity gap detected (history_latest=%d, activity_at=%d) — falling back to full sync' % (history_latest, activity_at), level=log_utils.LOGDEBUG)
+				return None
+		changed_shows = {}
+		for entry in history:
+			show = entry.get('show', {})
+			ids = show.get('ids', {})
+			trakt_id = str(ids.get('trakt', ''))
+			if trakt_id and trakt_id not in changed_shows:
+				changed_shows[trakt_id] = {
+					'imdb': str(ids.get('imdb', '')) if ids.get('imdb') else '',
+					'tvdb': str(ids.get('tvdb', '')) if ids.get('tvdb') else '',
+					'tmdb': str(ids.get('tmdb', '')) if ids.get('tmdb') else '',
+					'trakt': trakt_id
+				}
+		log_utils.log('TRAKT delta: %d show(s) changed (%d history events)' % (len(changed_shows), len(history)), level=log_utils.LOGDEBUG)
+		updated_indicators = []
+		for trakt_id, show_ids in changed_shows.items():
+			progress = getTraktAsJson('/shows/%s/progress/watched' % trakt_id, silent=True)
+			if not progress: continue
+			aired = int(progress.get('aired', 0))
+			reset_at = progress.get('reset_at')
+			episodes = {}
+			for season in progress.get('seasons', []):
+				snum = season.get('number', 0)
+				if snum == 0: continue
+				ep_nums = sorted(
+					ep['number'] for ep in season.get('episodes', [])
+					if ep.get('completed') and (reset_at is None or ep.get('last_watched_at', '') > reset_at)
+				)
+				if ep_nums:
+					episodes[snum] = _make_episode_ranges(ep_nums)
+			updated_indicators.append((show_ids, aired, episodes))
+		log_utils.log('TRAKT delta: shows delta complete: %d shows updated in %.1fs' % (len(updated_indicators), time.time() - _start), level=log_utils.LOGINFO)
+		return updated_indicators
+	except: log_utils.error(); return None
 
 # def syncTVShowsLibrary(indicators):
 # 	if indicators:
@@ -1917,6 +2007,7 @@ def sync_watchedProgress(activities=None, forced=False, trigger_refresh=True):
 
 def sync_watched(activities=None, forced=False): # writes to traktsync.db as of 1-19-2022
 	try:
+		FULL_SYNC_INTERVAL = 86400 # force a full resync every 24h to catch removes/resets
 		if forced:
 			cachesyncMovies()
 			cachesyncTVShows()
@@ -1929,16 +2020,34 @@ def sync_watched(activities=None, forced=False): # writes to traktsync.db as of 
 			moviesWatchedActivity = getMoviesWatchedActivity(activities)
 			db_movies_last_watched = timeoutsyncMovies()
 			if moviesWatchedActivity - db_movies_last_watched >= 30: # do not sync unless 30secs more to allow for variation between trakt post and local db update.
-				log_utils.log('Trakt Watched Movie Sync Update...(local db latest "watched_at" = %s, trakt api latest "watched_at" = %s)' % \
-								(str(db_movies_last_watched), str(moviesWatchedActivity)), __name__, log_utils.LOGDEBUG)
-				cachesyncMovies()
+				use_delta = db_movies_last_watched > 0 and (int(time.time()) - db_movies_last_watched) < FULL_SYNC_INTERVAL
+				log_utils.log('Trakt Watched Movie Sync Update...(local=%s, remote=%s, path=%s)' % \
+								(str(db_movies_last_watched), str(moviesWatchedActivity), 'delta' if use_delta else 'full'), __name__, log_utils.LOGDEBUG)
+				if use_delta:
+					new_ids = syncMovies_delta(db_movies_last_watched)
+					if new_ids and traktsync.merge_watched_movies(new_ids):
+						log_utils.log('TRAKT: movies delta merged %d new item(s)' % len(new_ids), __name__, log_utils.LOGDEBUG)
+					else:
+						log_utils.log('TRAKT: movies delta fallback to full sync (empty=%s)' % str(new_ids == []), __name__, log_utils.LOGDEBUG)
+						cachesyncMovies()
+				else:
+					cachesyncMovies()
 			episodesWatchedActivity = getEpisodesWatchedActivity(activities)
 			db_last_syncTVShows = timeoutsyncTVShows()
 			db_last_syncSeasons = traktsync.last_sync('last_syncSeasons_at')
 			if any(episodesWatchedActivity > value for value in (db_last_syncTVShows, db_last_syncSeasons)):
-				log_utils.log('Trakt Watched Shows Sync Update...(local db latest "watched_at" = %s, trakt api latest "watched_at" = %s)' % \
-								(str(min(db_last_syncTVShows, db_last_syncSeasons)), str(episodesWatchedActivity)), __name__, log_utils.LOGDEBUG)
-				cachesyncTVShows()
+				use_delta = db_last_syncTVShows > 0 and (int(time.time()) - db_last_syncTVShows) < FULL_SYNC_INTERVAL
+				log_utils.log('Trakt Watched Shows Sync Update...(local=%s, remote=%s, path=%s)' % \
+								(str(min(db_last_syncTVShows, db_last_syncSeasons)), str(episodesWatchedActivity), 'delta' if use_delta else 'full'), __name__, log_utils.LOGDEBUG)
+				if use_delta:
+					updated = syncTVShows_delta(db_last_syncTVShows, activity_at=episodesWatchedActivity)
+					if updated and traktsync.merge_watched_shows(updated):
+						log_utils.log('TRAKT: shows delta merged %d show(s)' % len(updated), __name__, log_utils.LOGDEBUG)
+					else:
+						log_utils.log('TRAKT: shows delta fallback to full sync (empty=%s, gap=%s)' % (str(updated == []), str(updated is None)), __name__, log_utils.LOGDEBUG)
+						cachesyncTVShows()
+				else:
+					cachesyncTVShows()
 				if time.time() - db_last_syncSeasons > 14400: # only run season sync every 4 hours in background to avoid memory pressure
 					control.sleep(5000)
 					service_syncSeasons()

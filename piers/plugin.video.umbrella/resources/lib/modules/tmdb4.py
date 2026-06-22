@@ -91,7 +91,7 @@ def authenticate(fromSettings=0):
 		if not read_token:
 			control.notification(title='TMDB v4', message='Please enter your TMDB v4 Read Access Token in Settings first.', icon='ERROR', time=5000)
 			if fromSettings:
-				control.openSettings('11.3', 'plugin.video.umbrella')
+				control.openSettings('8.3', 'plugin.video.umbrella')
 			return
 
 		read_headers = {
@@ -174,7 +174,7 @@ def authenticate(fromSettings=0):
 			control.notification(title='TMDB v4', message='Authorization cancelled or timed out.', icon='ERROR', time=5000)
 
 		if fromSettings:
-			control.openSettings('11.3', 'plugin.video.umbrella')
+			control.openSettings('8.3', 'plugin.video.umbrella')
 
 	except Exception as e:
 		log_utils.log('TMDB v4: authenticate() exception: %s' % str(e), level=log_utils.LOGWARNING)
@@ -187,7 +187,7 @@ def revoke(fromSettings=0):
 		access_token = getSetting('tmdb.v4.accesstoken')
 		if not access_token:
 			if fromSettings:
-				control.openSettings('11.3', 'plugin.video.umbrella')
+				control.openSettings('8.3', 'plugin.video.umbrella')
 			return
 
 		url = TMDB_V4_BASE + '/auth/access_token'
@@ -200,13 +200,13 @@ def revoke(fromSettings=0):
 		else:
 			control.notification(title='TMDB v4', message='Credentials cleared (server response: %s).' % response.status_code)
 		if fromSettings:
-			control.openSettings('11.3', 'plugin.video.umbrella')
+			control.openSettings('8.3', 'plugin.video.umbrella')
 	except:
 		log_utils.error()
 		setSetting('tmdb.v4.accesstoken', '')
 		setSetting('tmdb.v4.accountid', '')
 		if fromSettings:
-			control.openSettings('11.3', 'plugin.video.umbrella')
+			control.openSettings('8.3', 'plugin.video.umbrella')
 
 
 def get_user_lists():

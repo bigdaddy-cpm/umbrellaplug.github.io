@@ -192,7 +192,7 @@ def setIndicatorService():
 			li.setArt({'icon': icon, 'thumb': icon})
 			items.append(li)
 		select = control.selectDialog(items, 'Please select service to use for indicators:', useDetails=True)
-		if select == -1: control.openSettings('8.0', 'plugin.video.umbrella'); return
+		if select == -1: control.openSettings('5.0', 'plugin.video.umbrella'); return
 		selection, _, optionVal = service_map[select]
 
 		if currentSetting != optionVal:
@@ -204,7 +204,7 @@ def setIndicatorService():
 		control.setSetting('indicators.alt', optionVal)
 		control.homeWindow.setProperty('umbrella.updateSettings', 'true')
 		control.setSetting('indicators', str(selection))
-		control.openSettings('8.0', 'plugin.video.umbrella')
+		control.openSettings('5.0', 'plugin.video.umbrella')
 	except:
 		from resources.lib.modules import log_utils
 		log_utils.error()
@@ -228,13 +228,13 @@ def setScrobbleService():
 			li.setArt({'icon': icon, 'thumb': icon})
 			items.append(li)
 		select = control.selectDialog(items, getLS(40623), useDetails=True)
-		if select == -1: control.openSettings('8.0', 'plugin.video.umbrella'); return
+		if select == -1: control.openSettings('5.0', 'plugin.video.umbrella'); return
 		selection, _, optionVal = service_map[select]
 		control.homeWindow.setProperty('umbrella.updateSettings', 'false')
 		control.setSetting('scrobble.source', optionVal)
 		control.homeWindow.setProperty('umbrella.updateSettings', 'true')
 		control.setSetting('scrobble', str(selection))
-		control.openSettings('8.0', 'plugin.video.umbrella')
+		control.openSettings('5.0', 'plugin.video.umbrella')
 	except:
 		from resources.lib.modules import log_utils
 		log_utils.error()
@@ -309,6 +309,8 @@ def services_syncs():
 					if getSetting('indicators.alt') == '3':
 						mdblist.sync_watchedProgress(activities)
 					mdblist.sync_watch_list(activities)
+					mdblist.sync_collection(activities)
+					mdblist.sync_dropped(activities)
 				if not control.monitor.abortRequested():
 					if getSetting('bookmarks') == 'true' and getSetting('scrobble.source') == '3':
 						mdblist.sync_playbackProgress()

@@ -10,9 +10,8 @@ import xbmcaddon
 import xbmcgui
 import xbmcplugin
 import xbmcvfs
-#import xml.etree.ElementTree as ET
+import xml.etree.ElementTree as ET
 from threading import Thread
-from xml.dom.minidom import parse as mdParse
 from urllib.parse import unquote_plus
 from re import sub as re_sub
 
@@ -140,33 +139,35 @@ def setting(id, fallback=None):
 	return value
 
 def settings_fallback(id):
-	return {id: xbmcaddon.Addon().getSetting(id)}
+	try:
+		return {id: xbmcaddon.Addon().getSetting(id)}
+	except:
+		return {id: ''}
 
 def setSetting(id, value):
 	xbmcaddon.Addon().setSetting(id, value)
 
 def make_settings_dict(): # service runs upon a setting change
+	settings_dict = None
+	for attempt in range(2):
+		try:
+			root = ET.parse(settingsFile).getroot()
+			settings_dict = {}
+			for item in root.iter('setting'):
+				setting_id = item.get('id')
+				setting_value = item.text
+				if setting_value is None: setting_value = ''
+				settings_dict.update({setting_id: setting_value})
+			break
+		except:
+			if attempt < 1: xbmc.sleep(1000)
+	if settings_dict is None: return None
 	try:
-		#root = ET.parse(settingsFile).getroot()
-		root = mdParse(settingsFile) #minidom instead of element tree
-		curSettings = root.getElementsByTagName("setting") #minidom instead of element tree
-		settings_dict = {}
-		for item in curSettings:
-			dict_item = {}
-			#setting_id = item.get('id')
-			setting_id = item.getAttribute('id') #minidom instead of element tree
-			try:
-				setting_value = item.firstChild.data #minidom instead of element tree
-			except:
-				setting_value = None
-			if setting_value is None: setting_value = ''
-			dict_item = {setting_id: setting_value}
-			settings_dict.update(dict_item)
 		homeWindow.setProperty('umbrella_settings', jsdumps(settings_dict))
 		refresh_playAction()
 		refresh_libPath()
-		return settings_dict
-	except: return None
+	except: pass
+	return settings_dict
 
 def openSettings(query=None, id=addonInfo('id')):
 	try:

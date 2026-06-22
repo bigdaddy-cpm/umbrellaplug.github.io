@@ -22,10 +22,15 @@ getLS = control.lang
 highlightColor = control.setting('highlight.color')
 
 def _mdb_ts(ts_str):
-	#Normalize a MDBList ISO8601 timestamp so cleandate.iso_2_utc() can parse it.
 	if not ts_str: return ts_str
-	if '.' in ts_str: ts_str = ts_str[:ts_str.index('.')]
+	if '.' in ts_str: ts_str = re.sub(r'\.\d+', '', ts_str)  # strip only fractional seconds, preserve Z or tz suffix
 	if ts_str.endswith('Z'): ts_str = ts_str[:-1] + '+00:00'
+	if len(ts_str) == 7 and ts_str[4] == '-':
+		ts_str = ts_str + '-01T00:00:00+00:00'
+	elif len(ts_str) == 10 and ts_str[4] == '-' and 'T' not in ts_str:
+		ts_str = ts_str + 'T00:00:00+00:00'
+	elif 'T' in ts_str and '+' not in ts_str:
+		ts_str = ts_str + '+00:00'
 	return ts_str
 
 getSetting = control.setting
@@ -33,6 +38,7 @@ mdblist_baseurl = 'https://api.mdblist.com'
 mdblist_top_list = '/lists/top'
 mdblist_user_list = '/lists/user/'
 mdblist_liked_list = '/lists/liked'
+mdblist_official_list = '/lists/official'
 mdblist_page_limit = '?limit=%s' % getSetting('page.item.limit')
 _CLIENT_ID = 'YVFS6WW6GT4c2LvaHxHGa8YlB6u9zGgL6KjtDsHg'
 session = requests.Session()
@@ -57,6 +63,38 @@ def getMDBTopList(self, listType):
 		return items
 	except: log_utils.error('get MDBList Error: ')
 	return None
+
+def getMDBOfficialLists(self, listType):
+	try:
+		response = session.get(mdblist_baseurl + mdblist_official_list, timeout=20)
+		if isinstance(response, dict):
+			return None
+		items = _map_official_list(response, listType)
+		return items
+	except: log_utils.error('get MDBList Official Lists Error: ')
+	return None
+
+def _map_official_list(response, listType):
+    items = []
+    items_append = items.append
+    icon = 'userlists.png' if iconLogos else 'mdblist.png'
+    iconPath = control.joinPath(artPath, icon)
+    jsonResponse = response.json()
+    for i in jsonResponse:
+        item = {}
+        item['label'] = i.get('name')
+        item['art'] = {'icon': f'{iconPath}'}
+        item['params'] = {
+            'info': 'mdblist_officiallist',
+            'list_name': i.get('name'),
+            'list_id': i.get('slug'),
+            'list_count': i.get('items'),
+            'plugin_category': i.get('name')}
+        item['unique_ids'] = {
+            'slug': i.get('slug'),
+            'mdblist': i.get('id')}
+        items_append(item)
+    return items
 
 def _map_top_list(response, listType):
     items = []
@@ -227,6 +265,138 @@ def _map_user_watchlist_items(response, listType):
         items_append(item)
     return items
 
+def get_user_collection(listType):
+    try:
+        mediatype = 'movie' if listType == 'movie' else 'episode'
+        base_url = f"{mdblist_baseurl}/sync/collection?mediatype={mediatype}&limit=1000"
+        all_raw = []
+        url = base_url
+        while url:
+            response = session.get(url, timeout=20)
+            if isinstance(response, dict):
+                log_utils.log(response.error, level=log_utils.LOGDEBUG)
+                return None
+            data = response.json()
+            key = 'movies' if listType == 'movie' else 'episodes'
+            all_raw.extend(data.get(key) or [])
+            next_cursor = data.get('pagination', {}).get('next_cursor')
+            url = f"{base_url}&cursor={next_cursor}" if next_cursor else None
+        return _map_movie_collection_items(all_raw) if listType == 'movie' else _map_show_collection_items(all_raw)
+    except: log_utils.error('get MDBList Collection Error: ')
+    return None
+
+def _map_movie_collection_items(raw_list):
+    items = []
+    for i in raw_list:
+        try:
+            movie = i.get('movie', {})
+            ids = movie.get('ids', {})
+            collected_at = i.get('collected_at', '')
+            try: collected_fixed = collected_at[:-5] + 'Z' if collected_at else ''
+            except: collected_fixed = ''
+            items.append({
+                'label': movie.get('title'),
+                'title': movie.get('title'),
+                'release_year': movie.get('year'),
+                'imdb': ids.get('imdb', ''),
+                'tmdb': str(ids.get('tmdb', '') or ''),
+                'tvdb': '',
+                'id': ids.get('mdblist', ''),
+                'added': collected_fixed,
+            })
+        except: pass
+    return items
+
+def _map_show_collection_items(episodes_raw):
+    """Deduplicate episodes by show, returning one entry per unique show."""
+    seen = {}
+    for i in episodes_raw:
+        try:
+            show = i.get('episode', {}).get('show', {})
+            ids = show.get('ids', {})
+            imdb = ids.get('imdb', '')
+            tmdb = ids.get('tmdb', 0)
+            key = imdb or str(tmdb)
+            if not key or key in seen: continue
+            collected_at = i.get('collected_at', '')
+            try: collected_fixed = collected_at[:-5] + 'Z' if collected_at else ''
+            except: collected_fixed = ''
+            seen[key] = {
+                'label': show.get('title'),
+                'title': show.get('title'),
+                'release_year': show.get('year'),
+                'imdb': imdb,
+                'tmdb': str(tmdb or ''),
+                'tvdb': '',
+                'id': ids.get('mdblist', ''),
+                'added': collected_fixed,
+            }
+        except: pass
+    return list(seen.values())
+
+def _map_dropped_show_items(raw_list):
+    items = []
+    for i in raw_list:
+        try:
+            show = i.get('show') or i
+            ids = show.get('ids', {})
+            dropped_at = i.get('dropped_at', '')
+            try: dropped_fixed = dropped_at[:-5] + 'Z' if dropped_at else ''
+            except: dropped_fixed = ''
+            items.append({
+                'label': show.get('title'), 'title': show.get('title'),
+                'release_year': show.get('year'),
+                'imdb': ids.get('imdb', ''), 'tmdb': str(ids.get('tmdb', '') or ''),
+                'tvdb': str(ids.get('tvdb', '') or ''), 'id': ids.get('mdblist', ''),
+                'added': dropped_fixed,
+            })
+        except: pass
+    return items
+
+def get_user_dropped():
+    try:
+        base_url = f"{mdblist_baseurl}/sync/dropped?limit=1000"
+        all_raw = []
+        url = base_url
+        while url:
+            response = session.get(url, timeout=20)
+            if isinstance(response, dict):
+                log_utils.log(str(response), level=log_utils.LOGDEBUG)
+                return None
+            data = response.json()
+            all_raw.extend(data.get('shows') or [])
+            next_cursor = data.get('pagination', {}).get('next_cursor')
+            url = f"{base_url}&cursor={next_cursor}" if next_cursor else None
+        return _map_dropped_show_items(all_raw)
+    except: log_utils.error('get_user_dropped Error: ')
+    return None
+
+def getDroppedActivity(activities=None):
+    try:
+        if activities: i = activities
+        else: i = getActivities()
+        if not i: return 0
+        dropped_at = i.get('dropped_at')
+        if not dropped_at: return 0
+        return int(cleandate.iso_2_utc(_mdb_ts(dropped_at)) or 0)
+    except: log_utils.error()
+    return 0
+
+def sync_dropped(activities=None, forced=False):
+    try:
+        if forced:
+            items = get_user_dropped()
+            if items is not None: mdbsync.insert_dropped(items, 'shows_dropped')
+        else:
+            db_last_dropped = mdbsync.last_sync('last_dropped_at')
+            droppedActivity = getDroppedActivity(activities)
+            if droppedActivity - db_last_dropped >= 60:
+                log_utils.log('Mdb Dropped Sync Update...(local db latest "dropped_at" = %s, mdblist api latest "dropped_at" = %s)' % \
+                                    (str(db_last_dropped), str(droppedActivity)), __name__, log_utils.LOGINFO)
+                items = get_user_dropped()
+                if items is not None: mdbsync.insert_dropped(items, 'shows_dropped')
+    except: log_utils.error()
+
 def manager(name, imdb=None, tvdb=None, tmdb=None, watched=None, season=None, episode=None):
     lists = []
     try:
@@ -253,6 +423,11 @@ def manager(name, imdb=None, tvdb=None, tmdb=None, watched=None, season=None, ep
             items += [(getLS(40076) % highlight_color, 'scrobbleReset')]
         items += [(getLS(40596) % highlight_color, 'add')]
         items += [(getLS(40597) % highlight_color, 'remove')]
+        items += [(getLS(40707) % highlight_color, 'collection_add')]
+        items += [(getLS(40708) % highlight_color, 'collection_remove')]
+        if content_type == 'tvshow':
+            items += [(getLS(40712) % highlight_color, 'dropped_add')]
+            items += [(getLS(40713) % highlight_color, 'dropped_remove')]
         if not tvdb or tvdb == 'None':
             from resources.lib.menus import movies
             result = movies.Movies().getMDBUserList(create_directory=False, addremove=True)
@@ -279,7 +454,7 @@ def manager(name, imdb=None, tvdb=None, tmdb=None, watched=None, season=None, ep
                     unwatch(content_type, name, imdb=imdb, tvdb=tvdb, tmdb=tmdb, season=season, episode=episode)
                     return
                 if items[select][1] == 'scrobbleReset':
-                    scrobbleReset(imdb=imdb, tmdb=tmdb, tvdb=tvdb, season=season, episode=episode, refresh=True, clear_local=getSetting('indicators.alt') == '3')
+                    scrobbleReset(imdb=imdb, tmdb=tmdb, tvdb=tvdb, season=season, episode=episode, refresh=True, clear_local=True)
                     return
                 if not tvdb or tvdb == 'None': post = {"movies": [{"imdb": imdb}]}
                 else:
@@ -295,6 +470,41 @@ def manager(name, imdb=None, tvdb=None, tmdb=None, watched=None, season=None, ep
                     response = session.post(f"{mdblist_baseurl}/watchlist/items/remove", data=post, headers=headers, timeout=20)
                     action = 'remove'
                     listid = 'MDBList Watchlist'
+                if items[select][1] in ('collection_add', 'collection_remove'):
+                    import json as _cjson
+                    if not tvdb or tvdb == 'None':
+                        collection_post = _cjson.dumps({"movies": [{"ids": {"imdb": imdb, "tmdb": int(tmdb) if tmdb else None}}]})
+                    else:
+                        collection_post = _cjson.dumps({"shows": [{"ids": {"imdb": imdb}}]})
+                if items[select][1] == 'collection_add':
+                    response = session.post(f"{mdblist_baseurl}/sync/collection", data=collection_post, headers=headers, timeout=20)
+                    action = 'add'
+                    listid = 'MDBList Collection'
+                if items[select][1] == 'collection_remove':
+                    response = session.post(f"{mdblist_baseurl}/sync/collection/remove", data=collection_post, headers=headers, timeout=20)
+                    action = 'remove'
+                    listid = 'MDBList Collection'
+                if items[select][1] == 'dropped_add':
+                    import json as _djson
+                    from datetime import datetime as _dt
+                    _dpost = _djson.dumps({'shows': [{'ids': {'imdb': imdb}, 'dropped_at': _dt.utcnow().strftime('%Y-%m-%dT%H:%M:%SZ')}]})
+                    response = session.post(f"{mdblist_baseurl}/sync/dropped", data=_dpost, headers=headers, timeout=20)
+                    if response.status_code in (200, 201):
+                        mdbsync.insert_dropped([{'imdb': imdb, 'title': name, 'tmdb': str(tmdb or ''), 'tvdb': str(tvdb or '')}], 'shows_dropped', new_sync=False)
+                        control.notification(title='MDBList', message='%s added to Dropped' % name, icon=mdblist_icon)
+                    else:
+                        control.notification(title='MDBList', message='Error: %s' % response.text)
+                    control.hide(); return
+                if items[select][1] == 'dropped_remove':
+                    import json as _djson
+                    _dpost = _djson.dumps({'shows': [{'ids': {'imdb': imdb}}]})
+                    response = session.post(f"{mdblist_baseurl}/sync/dropped/remove", data=_dpost, headers=headers, timeout=20)
+                    if response.status_code in (200, 201):
+                        mdbsync.delete_dropped_items([imdb], 'shows_dropped', col_name='imdb')
+                        control.notification(title='MDBList', message='%s removed from Dropped' % name, icon=mdblist_icon)
+                    else:
+                        control.notification(title='MDBList', message='Error: %s' % response.text)
+                    control.hide(); return
                 for count in range(len(lists)):
                     i = lists[count]
                     if i[1] == '%s' % items[select][1]:
@@ -353,9 +563,103 @@ def sync_watch_list(activities=None, forced=False):
                 mdbsync.insert_watch_list(items, 'shows_watchlist')
     except: log_utils.error()
 
+def get_mdb_collection_as_json(url, listKind):
+    try:
+        mediatype = 'movie' if listKind == 'movie' else 'episode'
+        key = 'movies' if listKind == 'movie' else 'episodes'
+        base_url = f"{url}?mediatype={mediatype}&limit=1000"
+        all_raw = []
+        current_url = base_url
+        while current_url:
+            response = session.get(current_url, timeout=20)
+            if isinstance(response, dict):
+                log_utils.log(response.error, level=log_utils.LOGDEBUG)
+                return None
+            data = response.json()
+            all_raw.extend(data.get(key) or [])
+            next_cursor = data.get('pagination', {}).get('next_cursor')
+            current_url = f"{base_url}&cursor={next_cursor}" if next_cursor else None
+        return _map_movie_collection_items(all_raw) if listKind == 'movie' else _map_show_collection_items(all_raw)
+    except: log_utils.error()
+    return None
+
+def sync_collection(activities=None, forced=False):
+    try:
+        link = f"{mdblist_baseurl}/sync/collection"
+        if forced:
+            items = get_mdb_collection_as_json(link, 'movie')
+            if items is not None: mdbsync.insert_collection(items, 'movies_collection')
+            items = get_mdb_collection_as_json(link, 'tvshow')
+            if items is not None: mdbsync.insert_collection(items, 'shows_collection')
+        else:
+            db_last_collection = mdbsync.last_sync('last_collected_at')
+            collectionActivity = getCollectedActivity(activities)
+            if collectionActivity - db_last_collection >= 60:
+                log_utils.log('Mdb Collection Sync Update...(local db latest "collected_at" = %s, mdblist api latest "collected_at" = %s)' % \
+                                    (str(db_last_collection), str(collectionActivity)), __name__, log_utils.LOGINFO)
+                items = get_mdb_collection_as_json(link, 'movie')
+                if items is not None: mdbsync.insert_collection(items, 'movies_collection')
+                items = get_mdb_collection_as_json(link, 'tvshow')
+                if items is not None: mdbsync.insert_collection(items, 'shows_collection')
+    except: log_utils.error()
+
+def getCollectedActivity(activities=None):
+    try:
+        if activities: i = activities
+        else: i = getActivities()
+        if not i: return 0
+        activity = []
+        collected_at = i.get('collected_at')
+        if collected_at: activity.append(collected_at)
+        if not activity: return 0
+        activity = [int(cleandate.iso_2_utc(_mdb_ts(i)) or 0) for i in activity]
+        activity = sorted(activity, key=int)[-1]
+        return activity
+    except: log_utils.error()
+    return 0
+
+def removeCollectionItems(media_type, imdb_list):
+    """Remove items from MDBList collection. media_type: 'movies' or 'shows'. imdb_list: list of IMDb IDs."""
+    if not imdb_list: return
+    try:
+        import json as _json
+        total_items = len(imdb_list)
+        if media_type == 'movies':
+            post = _json.dumps({'movies': [{'ids': {'imdb': i}} for i in imdb_list]})
+            table = 'movies_collection'
+        else:
+            post = _json.dumps({'shows': [{'ids': {'imdb': i}} for i in imdb_list]})
+            table = 'shows_collection'
+        response = session.post('%s/sync/collection/remove' % mdblist_baseurl, data=post, headers=headers, timeout=20)
+        if response.status_code == 200:
+            mdbsync.delete_collection_items(imdb_list, table, col_name='imdb')
+            control.trigger_widget_refresh()
+            control.notification(title='MDBList Collection Manager',
+                message='Successfully Removed %s Item%s' % (total_items, 's' if total_items > 1 else ''))
+        else:
+            control.notification(title='MDBList', message='Error: %s' % response.text)
+    except: log_utils.error()
+
+def removeDroppedItems(imdb_list):
+    """Remove shows from MDBList dropped. imdb_list: list of IMDb IDs."""
+    if not imdb_list: return
+    try:
+        import json as _json
+        total_items = len(imdb_list)
+        post = _json.dumps({'shows': [{'ids': {'imdb': i}} for i in imdb_list]})
+        response = session.post('%s/sync/dropped/remove' % mdblist_baseurl, data=post, headers=headers, timeout=20)
+        if response.status_code in (200, 201):
+            mdbsync.delete_dropped_items(imdb_list, 'shows_dropped', col_name='imdb')
+            control.trigger_widget_refresh()
+            control.notification(title='MDBList Dropped Manager',
+                message='Successfully Removed %s Item%s' % (total_items, 's' if total_items > 1 else ''))
+        else:
+            control.notification(title='MDBList', message='Error: %s' % response.text)
+    except: log_utils.error()
+
 def get_mdb_list_as_json(url, listKind):
     response = session.get(url, timeout=20)
-    if isinstance(response, dict): 
+    if isinstance(response, dict):
         log_utils.log(response.error, level=log_utils.LOGDEBUG)
         return None
     items = []
@@ -408,9 +712,8 @@ def get_list_items_for_library(url):
 
 def getWatchListedActivity(activities=None):
     try:
-        link = f"{mdblist_baseurl}/sync/last_activities"
         if activities: i = activities
-        else: i = session.get(link, timeout=20)
+        else: i = getActivities()
         if not i: return 0
         activity = []
         activity.append(i['watchlisted_at'])
@@ -434,7 +737,7 @@ def mdblistAuth(fromSettings=0):
 			timeout=20)
 		if response.status_code != 200:
 			control.notification(title='MDBList', message='Authorization request failed')
-			if fromSettings: control.openSettings('8.4', 'plugin.video.umbrella')
+			if fromSettings: control.openSettings('5.4', 'plugin.video.umbrella')
 			return False
 		device_data = response.json()
 		device_code = device_data['device_code']
@@ -480,18 +783,18 @@ def mdblistAuth(fromSettings=0):
 			progressDialog.close()
 		if not access_token:
 			control.notification(title='MDBList', message='Authorization failed or timed out')
-			if fromSettings: control.openSettings('8.4', 'plugin.video.umbrella')
+			if fromSettings: control.openSettings('5.4', 'plugin.video.umbrella')
 			return False
 		control.setSetting('mdblist.token', access_token)
 		if refresh_token:
 			control.setSetting('mdblist.refresh.token', refresh_token)
 		session.headers.update({'Authorization': 'Bearer %s' % access_token})
 		control.notification(title='MDBList', message='MDBList Authorized Successfully')
-		if fromSettings: control.openSettings('8.4', 'plugin.video.umbrella')
+		if fromSettings: control.openSettings('5.4', 'plugin.video.umbrella')
 		return True
 	except:
 		log_utils.error()
-		if fromSettings: control.openSettings('8.4', 'plugin.video.umbrella')
+		if fromSettings: control.openSettings('5.4', 'plugin.video.umbrella')
 		return False
 
 def mdblistRevoke(fromSettings=0):
@@ -502,9 +805,36 @@ def mdblistRevoke(fromSettings=0):
 		control.notification(title='MDBList', message='MDBList Authorization Revoked')
 	except: log_utils.error()
 	finally:
-		if fromSettings: control.openSettings('8.4', 'plugin.video.umbrella')
+		if fromSettings: control.openSettings('5.4', 'plugin.video.umbrella')
 
-def get_request(url, post=None, method='GET'):
+def _refresh_token():
+	try:
+		refresh_token = getSetting('mdblist.refresh.token')
+		if not refresh_token:
+			return False
+		resp = session.post(
+			'https://api.mdblist.com/oauth/token/',
+			data={'grant_type': 'refresh_token', 'refresh_token': refresh_token, 'client_id': _CLIENT_ID},
+			timeout=20
+		)
+		if resp.status_code == 200:
+			data = resp.json()
+			access_token = data.get('access_token', '')
+			new_refresh = data.get('refresh_token', '')
+			if access_token:
+				control.setSetting('mdblist.token', access_token)
+				if new_refresh:
+					control.setSetting('mdblist.refresh.token', new_refresh)
+				session.headers.update({'Authorization': 'Bearer %s' % access_token})
+				log_utils.log('MDBList token refreshed successfully', level=log_utils.LOGDEBUG)
+				return True
+		log_utils.log('MDBList token refresh failed: status=%s body=%r' % (resp.status_code, resp.text[:200]), level=log_utils.LOGDEBUG)
+		return False
+	except:
+		log_utils.error()
+		return False
+
+def get_request(url, post=None, method='GET', _retried=False):
 	try:
 		full_url = f"{mdblist_baseurl}{url}"
 		import json as _json
@@ -526,6 +856,10 @@ def get_request(url, post=None, method='GET'):
 		if response.status_code in (200, 201, 204):
 			try: return response.json()
 			except: return {}
+		if response.status_code == 401 and not _retried:
+			if _refresh_token():
+				return get_request(url, post=post, method=method, _retried=True)
+			control.notification(title='MDBList', message='MDBList session expired — please re-authenticate in settings')
 		log_utils.log('MDBList get_request non-2xx: url=%s status=%s body=%r' % (url, response.status_code, response.text[:200]), level=log_utils.LOGDEBUG)
 		return None
 	except: log_utils.error()
@@ -584,7 +918,7 @@ def sync_watchedProgress(activities=None, forced=False):
 	try:
 		db_last = mdbsync.last_sync('last_watched_at')
 		api_last = getWatchedActivity(activities)
-		if not forced and (api_last - db_last) < 60: return
+		if not forced and db_last and (api_last - db_last) < 60: return
 		from datetime import datetime as _dt
 		since = _dt.utcfromtimestamp(db_last).strftime('%Y-%m-%dT%H:%M:%SZ') if db_last else '1970-01-01T00:00:00Z'
 		offset = 0
@@ -758,6 +1092,15 @@ def cachesyncTV(imdb, tvdb):
 			executor.submit(cachesyncSeasons, imdb, tvdb, 0)
 	except: log_utils.error()
 
+def _clr_episode_progress_cache():
+	try:
+		from resources.lib.menus.episodes import Episodes
+		from resources.lib.database import cache
+		ep = Episodes()
+		cache.remove(ep.mdblist_progress_list, '/upnext', ep.mdblist_directProgressScrape)
+		cache.remove(ep.mdblist_progress_list, 'mdbprogress', ep.mdblist_directProgressScrape)
+	except: log_utils.error()
+
 
 def _scrobble(endpoint, media_type, imdb, tmdb, tvdb, season, episode, percent):
 	try:
@@ -765,12 +1108,11 @@ def _scrobble(endpoint, media_type, imdb, tmdb, tvdb, season, episode, percent):
 		if media_type == 'movie':
 			post = {'movie': {'ids': {'imdb': imdb, 'tmdb': int(tmdb) if tmdb else None}}, 'progress': percent}
 		else:
-			season = int('%01d' % int(season)) if season else 1
-			episode = int('%01d' % int(episode)) if episode else 1
 			post = {
 				'show': {
 					'ids': {'imdb': imdb, 'tmdb': int(tmdb) if tmdb else None, 'tvdb': int(tvdb) if tvdb else None},
-					'season': {'number': season, 'episode': {'number': episode}}
+					'season': int('%01d' % int(season)) if season else 1,
+					'episode': int('%01d' % int(episode)) if episode else 1
 				},
 				'progress': percent
 			}
@@ -788,11 +1130,10 @@ def scrobbleMovie(title, year, imdb, tmdb, watched_percent):
 		result = _scrobble('/scrobble/pause', 'movie', imdb, tmdb, '', '', '', watched_percent)
 		if result is not None and getSetting('scrobble.notify') == 'true':
 			control.notification(message=40657)
-		if result is not None:
-			from datetime import datetime as _dt
-			paused_at = _dt.utcnow().strftime('%Y-%m-%dT%H:%M:%S.000Z')
-			mdbsync.upsert_bookmark(title=title or '', imdb=str(imdb) if imdb else '', tmdb=str(tmdb) if tmdb else '', percent_played=str(watched_percent), paused_at=paused_at)
-			control.trigger_widget_refresh()
+		from datetime import datetime as _dt
+		paused_at = _dt.utcnow().strftime('%Y-%m-%dT%H:%M:%S.000Z')
+		mdbsync.upsert_bookmark(title=title or '', imdb=str(imdb) if imdb else '', tmdb=str(tmdb) if tmdb else '', percent_played=str(watched_percent), paused_at=paused_at)
+		control.trigger_widget_refresh()
 		log_utils.log('MDBList Scrobble Movie. imdb: %s percent: %s' % (imdb, watched_percent), level=log_utils.LOGDEBUG)
 	except: log_utils.error()
 
@@ -801,34 +1142,45 @@ def scrobbleEpisode(tvshowtitle, year, imdb, tmdb, tvdb, season, episode, watche
 		result = _scrobble('/scrobble/pause', 'episode', imdb, tmdb, tvdb, season, episode, watched_percent)
 		if result is not None and getSetting('scrobble.notify') == 'true':
 			control.notification(message=40657)
-		if result is not None:
-			from datetime import datetime as _dt
-			paused_at = _dt.utcnow().strftime('%Y-%m-%dT%H:%M:%S.000Z')
-			mdbsync.upsert_bookmark(tvshowtitle=tvshowtitle or '', imdb=str(imdb) if imdb else '', tmdb=str(tmdb) if tmdb else '', tvdb=str(tvdb) if tvdb else '', season=str(season) if season else '', episode=str(episode) if episode else '', percent_played=str(watched_percent), paused_at=paused_at)
-			control.trigger_widget_refresh()
+		from datetime import datetime as _dt
+		paused_at = _dt.utcnow().strftime('%Y-%m-%dT%H:%M:%S.000Z')
+		mdbsync.upsert_bookmark(tvshowtitle=tvshowtitle or '', imdb=str(imdb) if imdb else '', tmdb=str(tmdb) if tmdb else '', tvdb=str(tvdb) if tvdb else '', season=str(season) if season else '', episode=str(episode) if episode else '', percent_played=str(watched_percent), paused_at=paused_at)
+		control.trigger_widget_refresh()
 		log_utils.log('MDBList Scrobble Episode. imdb: %s S%sE%s percent: %s' % (imdb, season, episode, watched_percent), level=log_utils.LOGDEBUG)
 	except: log_utils.error()
 
 def scrobbleReset(imdb, tmdb='', tvdb='', season=None, episode=None, refresh=False, clear_local=True, already_watched=False):
 	if not getMDBListCredentialsInfo(): return
 	try:
+		if episode:
+			ids = {}
+			if imdb: ids['imdb'] = imdb
+			if tmdb: ids['tmdb'] = int(tmdb)
+			if tvdb: ids['tvdb'] = int(tvdb)
+			post = {'show': {'ids': ids, 'season': int(season) if season else 1, 'episode': int(episode)}, 'progress': 0}
+		else:
+			ids = {}
+			if imdb: ids['imdb'] = imdb
+			if tmdb: ids['tmdb'] = int(tmdb)
+			post = {'movie': {'ids': ids}, 'progress': 0}
+		get_request('/scrobble/clear', post=post)
 		if not already_watched:
 			if episode:
 				_post_sync_watched(show_ids={'imdb': imdb, 'tmdb': tmdb, 'tvdb': tvdb},
 					seasons_dict={int(season) if season else 1: [int(episode)]})
+				_clr_episode_progress_cache()
 			elif season:
 				pass  # season-level reset clears local resume points only, no re-mark-watched
 			else:
 				_post_sync_watched(movies=[{'imdb': imdb, 'tmdb': tmdb}])
-		if clear_local:
-			if episode:
-				mdbsync.delete_bookmark(imdb, tvdb or '', season or '', episode)
-			elif season:
-				mdbsync.delete_bookmarks_for_season(imdb, tvdb or '', season)
-			else:
-				mdbsync.delete_bookmark(imdb, tvdb or '', '', '')
-			sync_watchedProgress(forced=True)
-			control.trigger_widget_refresh()
+		if episode:
+			mdbsync.delete_bookmark(imdb, tvdb or '', season or '', episode)
+		elif season:
+			mdbsync.delete_bookmarks_for_season(imdb, tvdb or '', season)
+		else:
+			mdbsync.delete_bookmark(imdb, tvdb or '', '', '')
+		sync_watchedProgress(forced=True)
+		control.trigger_widget_refresh()
 		if refresh: control.refresh()
 		if getSetting('scrobble.notify') == 'true':
 			control.notification(title='MDBList', message='Successfully Removed MDBList playback progress')
@@ -839,9 +1191,10 @@ def sync_playbackProgress(forced=False):
 	try:
 		items = get_request('/sync/playback')
 		if items is None: return
-		mdbsync.clear_bookmarks()
+		server_ids = set()
 		for i in items:
 			resume_id = str(i.get('id', ''))
+			server_ids.add(resume_id)
 			percent_played = str(i.get('progress', '0'))
 			paused_at = i.get('paused_at', '')
 			if i.get('type') == 'episode':
@@ -861,6 +1214,7 @@ def sync_playbackProgress(forced=False):
 				imdb = str(movie_ids.get('imdb', '') or '')
 				tmdb = str(movie_ids.get('tmdb', '') or '')
 				mdbsync.upsert_bookmark(title=title, resume_id=resume_id, imdb=imdb, tmdb=tmdb, percent_played=percent_played, paused_at=paused_at)
+		mdbsync.delete_synced_bookmarks_not_in(server_ids)
 	except: log_utils.error()
 
 def removeWatchlistItems(media_type, imdb_list):
@@ -956,6 +1310,7 @@ def markEpisodeAsWatched(imdb, tvdb, season, episode, tmdb=''):
 		mdbsync.upsert_watched_episode(show_imdb=imdb, show_tvdb=str(tvdb), season=season, episode=episode,
 			last_watched_at=__import__('datetime').datetime.utcnow().strftime("%Y-%m-%dT%H:%M:%S.000Z"))
 		mdbsync.cache_delete(mdbsync._hash_function(syncTVShows, ()))
+		_clr_episode_progress_cache()
 		return True
 	except: log_utils.error()
 
@@ -1059,7 +1414,9 @@ def watch(content_type, name, imdb=None, tvdb=None, tmdb=None, season=None, epis
 		if success: cachesyncTV(imdb, tvdb)
 	elif content_type == 'episode':
 		success = markEpisodeAsWatched(imdb, tvdb, season, episode, tmdb or '')
-		if success: cachesyncTV(imdb, tvdb)
+		if success:
+			cachesyncTV(imdb, tvdb)
+			_clr_episode_progress_cache()
 	control.hide()
 	if refresh: control.refresh()
 	control.trigger_widget_refresh()

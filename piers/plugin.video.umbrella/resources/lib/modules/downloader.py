@@ -16,7 +16,7 @@ levels =['../../../..', '../../..', '../..', '..']
 video_extensions = ('.3gp', '.avi', '.divx', '.flv', '.m4v', '.mp4', '.mpeg', '.mpg', '.m2ts', '.mov', '.mkv', '.wmv', '.webm', '.xvid')
 
 
-def download(name, image, url, meta_name=None, pack=None): # needs re-write, pack file support
+def download(name, image, url, meta_name=None, pack=None, no_confirm=False): # needs re-write, pack file support
 	if control.setting('debug.level') == '1':
 		log_utils.log('name: %s' % name, __name__)
 		log_utils.log('image: %s' % image, __name__)
@@ -65,7 +65,8 @@ def download(name, image, url, meta_name=None, pack=None): # needs re-write, pac
 				log_utils.log('content: %s' % str(content), __name__)
 			# transname = url.rsplit('/', 1)[1].split('|')[0]
 			url_basename = unquote(url.rsplit('/', 1)[1].split('|')[0])
-			if any(url_basename.lower().endswith(ext) for ext in ('.3gp', '.avi', '.divx', '.flv', '.m4v', '.mp4', '.mpeg', '.mpg', '.m2ts', '.mov', '.mkv', '.wmv', '.webm', '.xvid')):
+			basename_has_ep = bool(re.search(r'S\d{1,2}E\d{1,2}', url_basename, re.I))
+			if basename_has_ep and any(url_basename.lower().endswith(ext) for ext in ('.3gp', '.avi', '.divx', '.flv', '.m4v', '.mp4', '.mpeg', '.mpg', '.m2ts', '.mov', '.mkv', '.wmv', '.webm', '.xvid')):
 				transname = url_basename
 
 
@@ -155,8 +156,84 @@ def download(name, image, url, meta_name=None, pack=None): # needs re-write, pac
 		if not ext in ('3gp', 'divx', 'xvid', 'm4v', 'mp4', 'mpeg', 'mpg', 'm2ts', 'mov', 'mkv', 'flv', 'avi', 'wmv', 'webm'): ext = 'mp4'
 		dest = os.path.join(dest, transname + '.' + ext)
 		# doDownload(url, dest, name, image, headers)
-		doDownload(url, dest, transname + '.' + ext, image, headers)
+		doDownload(url, dest, transname + '.' + ext, image, headers, no_confirm=no_confirm)
 	except: log_utils.error('url: %s' % url)
+
+def download_pack(name, image, info):
+	debrid = info.get('debrid', '')
+	url = info.get('url', '')
+	info_hash = info.get('hash', '')
+
+	if 'Real-Debrid' in debrid:
+		from resources.lib.debrid.realdebrid import RealDebrid as DebridClass
+		def resolve(d, link): return d.unrestrict_link(link)
+	elif 'Premiumize' in debrid:
+		from resources.lib.debrid.premiumize import Premiumize as DebridClass
+		def resolve(d, link): return d.add_headers_to_url(link)
+	elif 'AllDebrid' in debrid:
+		from resources.lib.debrid.alldebrid import AllDebrid as DebridClass
+		def resolve(d, link): return d.unrestrict_link(link)
+	elif 'Offcloud' in debrid:
+		from resources.lib.debrid.offcloud import Offcloud as DebridClass
+		def resolve(d, link): return link
+	elif 'TorBox' in debrid:
+		from resources.lib.debrid.torbox import TorBox as DebridClass
+		def resolve(d, link): return d.add_headers_to_url(d.unrestrict_link(link))
+	else:
+		return log_utils.log('download_pack: unsupported debrid: %s' % debrid)
+
+	control.busy()
+	try:
+		svc = DebridClass()
+		file_list = svc.display_magnet_pack(url, info_hash)
+	except:
+		log_utils.error()
+		return control.hide()
+
+	if not file_list:
+		control.hide()
+		return control.notification(message='No files found in pack', icon='WARNING')
+
+	video_files = sorted(
+		[f for f in file_list if any(f.get('filename', '').lower().endswith(ext) for ext in video_extensions)],
+		key=lambda f: f.get('filename', '').lower()
+	)
+	if not video_files:
+		video_files = sorted(file_list, key=lambda f: f.get('filename', '').lower())
+
+	total_size = sum(f.get('size', 0) for f in video_files)
+	control.hide()
+
+	if control.yesnoDialog(
+		'%d files  |  %.2f GB total' % (len(video_files), total_size / float(1073741824)),
+		'Pack: %s' % name,
+		'Download all files?',
+		'[B]Download Pack[/B]', 'Download', 'Cancel'
+	) == 1:
+		return
+
+	total = len(video_files)
+	control.progressDialog.create('Downloading Pack', name)
+	try:
+		for idx, f in enumerate(video_files):
+			if control.progressDialog.iscanceled():
+				break
+			filename = f.get('filename', '')
+			link = f.get('link', '')
+			if not filename or not link:
+				continue
+			pct = int(idx * 100 / total)
+			control.progressDialog.update(pct, '%d / %d  |  %s' % (idx + 1, total, filename))
+			try:
+				resolved = resolve(svc, link)
+			except:
+				log_utils.error('Failed to resolve: %s' % filename)
+				continue
+			if resolved:
+				download(filename, image, resolved, meta_name=None, pack=None, no_confirm=True)
+	finally:
+		control.progressDialog.close()
+
 
 def getResponse(url, headers, size):
 	try:
@@ -187,7 +264,7 @@ def done(title, dest, downloaded):
 	except:
 		log_utils.error()
 
-def doDownload(url, dest, title, image, headers):
+def doDownload(url, dest, title, image, headers, no_confirm=False):
 
 	if control.setting('debug.level') == '1':
 		log_utils.log('url: %s' % url, __name__)
@@ -222,7 +299,8 @@ def doDownload(url, dest, title, image, headers):
 	resume = 0
 	sleep = 0
 	control.hide()
-	if control.yesnoDialog('File Size: %sGB' % gb, 'Path: %s' % dest, 'Continue with download?', '[B]Confirm Download[/B]', 'Confirm', 'Cancel') == 1: return
+	if not no_confirm:
+		if control.yesnoDialog('File Size: %sGB' % gb, 'Path: %s' % dest, 'Continue with download?', '[B]Confirm Download[/B]', 'Confirm', 'Cancel') == 1: return
 	f = control.openFile(dest, 'w')
 	chunk = None
 	chunks = []

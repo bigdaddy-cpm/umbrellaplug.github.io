@@ -206,4 +206,56 @@ def get_watched_count_for_show(imdb_id):
 	return 0
 
 
+def save_progress(media_type, imdb_id, tmdb_id, season, episode, title, resume_point, curr_time_secs):
+	try:
+		last_played = get_current_time()
+		sql = "INSERT OR REPLACE INTO progress VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)"
+		vals = (media_type, str(imdb_id), str(tmdb_id or ''), int(season or 0), int(episode or 0),
+				title, str(resume_point), str(curr_time_secs), str(last_played), 0)
+		watched_cache.insert(sql, vals)
+	except:
+		from resources.lib.modules import log_utils
+		log_utils.error()
+
+
+def delete_progress(media_type, imdb_id, tmdb_id='', season=0, episode=0):
+	try:
+		if media_type == 'movie':
+			if imdb_id:
+				watched_cache.insert("DELETE FROM progress WHERE media_type = 'movie' AND imdb_id = ?", (str(imdb_id),))
+			elif tmdb_id:
+				watched_cache.insert("DELETE FROM progress WHERE media_type = 'movie' AND tmdb_id = ?", (str(tmdb_id),))
+		elif media_type == 'episode':
+			watched_cache.insert(
+				"DELETE FROM progress WHERE media_type = 'episode' AND imdb_id = ? AND season = ? AND episode = ?",
+				(str(imdb_id), int(season or 0), int(episode or 0)))
+	except:
+		from resources.lib.modules import log_utils
+		log_utils.error()
+
+
+def get_movies_in_progress():
+	try:
+		sql = "SELECT * FROM progress WHERE media_type = 'movie' ORDER BY CAST(last_played AS INTEGER) DESC"
+		rows = watched_cache.select_all(sql)
+		if rows:
+			return [dict(r) for r in rows]
+	except:
+		from resources.lib.modules import log_utils
+		log_utils.error()
+	return []
+
+
+def get_episodes_in_progress():
+	try:
+		sql = "SELECT * FROM progress WHERE media_type = 'episode' ORDER BY CAST(last_played AS INTEGER) DESC"
+		rows = watched_cache.select_all(sql)
+		if rows:
+			return [dict(r) for r in rows]
+	except:
+		from resources.lib.modules import log_utils
+		log_utils.error()
+	return []
+
+
 watched_cache = WatchedCache()

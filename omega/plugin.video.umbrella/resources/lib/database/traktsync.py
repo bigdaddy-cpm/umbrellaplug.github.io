@@ -839,6 +839,44 @@ def cache_insert(key, value):
 		try: dbcon.close()
 		except: pass
 
+def merge_watched_shows(updated_indicators):
+	"""Merge per-show delta updates into the existing syncTVShows cache blob."""
+	try:
+		from resources.lib.modules.trakt import syncTVShows
+		key = _hash_function(syncTVShows, ())
+		cached = cache_get(key)
+		if not cached: return False
+		existing = literal_eval(cached['value'])
+		if not existing: return False
+		idx = {e[0].get('trakt', ''): e for e in existing
+			   if isinstance(e, tuple) and len(e) == 3 and e[0].get('trakt', '')}
+		for entry in updated_indicators:
+			tid = entry[0].get('trakt', '')
+			if tid: idx[tid] = entry
+		cache_insert(key, repr(list(idx.values())))
+		return True
+	except:
+		from resources.lib.modules import log_utils
+		log_utils.error()
+		return False
+
+def merge_watched_movies(new_imdb_ids):
+	"""Add newly watched movie IMDb IDs into the existing syncMovies cache blob."""
+	try:
+		from resources.lib.modules.trakt import syncMovies
+		key = _hash_function(syncMovies, ())
+		cached = cache_get(key)
+		if not cached: return False
+		existing = literal_eval(cached['value'])
+		if not existing: return False
+		updated = list(set(existing) | set(new_imdb_ids))
+		cache_insert(key, repr(updated))
+		return True
+	except:
+		from resources.lib.modules import log_utils
+		log_utils.error()
+		return False
+
 def remove(function, *args):
 	try:
 		key = _hash_function(function, args)

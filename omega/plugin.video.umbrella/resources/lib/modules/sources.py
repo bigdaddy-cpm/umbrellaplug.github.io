@@ -1238,7 +1238,9 @@ class Sources:
 				self.prem_providers.sort(key=lambda k: k[1])
 				self.prem_providers = [i[0] for i in self.prem_providers]
 				#log_utils.log('self.prem_providers sort order=%s' % self.prem_providers, level=log_utils.LOGDEBUG)
-				self.filter.sort(key=lambda k: self.prem_providers.index(k['debrid'] if k.get('debrid', '') else k['provider']))
+				self.filter.sort(key=lambda k: self.prem_providers.index(
+					k.get('debrid', '') or _cloud_to_debrid.get(k.get('provider', ''), k.get('provider', ''))
+				) if (k.get('debrid', '') or _cloud_to_debrid.get(k.get('provider', ''), k.get('provider', ''))) in self.prem_providers else 10**6)
 		except: log_utils.error()
 
 		self.filter += local # library and video scraper sources
@@ -1263,7 +1265,7 @@ class Sources:
 			_prov_list = list(self.prem_providers)
 		def _qrank(src): return _qmap.get(src.get('quality', 'SD'), 5)
 		def _prank(src):
-			key = src.get('debrid', '') or src.get('provider', '')
+			key = src.get('debrid', '') or _cloud_to_debrid.get(src.get('provider', ''), src.get('provider', ''))
 			try: return _prov_list.index(key)
 			except: return 10**6
 		_prefer_smaller = getSetting('source.prefer.smaller') == 'true'
@@ -1305,10 +1307,11 @@ class Sources:
 			filter += [i for i in self.sources if i not in filter]
 			self.sources = filter
 
-		filter = [] # filter to place cloud files first
-		filter += [i for i in self.sources if i['source'] == 'cloud']
-		filter += [i for i in self.sources if i not in filter]
-		self.sources = filter
+		if getSetting('cloud.sources.first') == 'true': # filter to place cloud files first
+			filter = []
+			filter += [i for i in self.sources if i['source'] == 'cloud']
+			filter += [i for i in self.sources if i not in filter]
+			self.sources = filter
 
 		self.sources = self.sources[:4000]
 		control.hide()

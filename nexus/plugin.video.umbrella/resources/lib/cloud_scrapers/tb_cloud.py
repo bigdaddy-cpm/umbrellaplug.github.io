@@ -176,13 +176,11 @@ class source:
 			return None
 
 	def _scraper(self, function, results, mediatype):
-		from resources.lib.modules import log_utils
 		try:
 			response = function()
-			log_utils.log('TB_CLOUD _scraper [%s] raw response: %s' % (mediatype, str(response)))
 			if not response: return
 			items = [{**i, 'mediatype': mediatype} for i in (response.get('data') or []) if i.get('download_finished') or i.get('download_state') == 'completed']
-			log_utils.log('TB_CLOUD _scraper [%s] filtered items: %d' % (mediatype, len(items)))
 			results += items
-		except Exception as e:
-			log_utils.log('TB_CLOUD _scraper [%s] exception: %s' % (mediatype, str(e)))
+		except:
+			from resources.lib.modules import log_utils
+			log_utils.error('TB_CLOUD: ')

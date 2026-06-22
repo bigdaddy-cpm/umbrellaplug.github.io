@@ -1,3 +1,24 @@
+
+[B]Update - v6.7.78 - June 22nd, 2026 [/B]
+--[Change] Added support for Collection from MDBList. Add/Remove/View
+--[Change] Added official lists from MDBList.
+--[Fix] Fix for MDBList Watchlist and Collection pagination.
+--[Change] Added support for "dropped" in MDBList.
+--[Change] Added support for pause actions on simkl and mdblist.
+--[Fix] System service changed to use daemon for users getting shutdown errors.
+--[Fix] Reverted change for cloud scrapers from using startwith to in.
+--[Fix] Added a fix for tmdb pagination not working correctly after page 1.
+--[Change] Added setting for tmdb pagination to be enabled/disabled.
+--[Change] MDBList change for refereshing list on episode completion.
+--[Change] MDBList episodes in progress no longer uses cache when reloading after watching an episode.
+--[Change] Added window property to refresh trakt list after an item removal instead of getting from cache.
+--[Change] Added "Finish Watching" for local tracking.
+--[Fix] Changed make_settings_dict to use ET instead of minidom.
+--[Fix] Change made for updating watch history table when an item has been marked as unwatched.
+--[Fix] Correction to make authorizations open the correct settings after authorization is complete. Wrong due to removing 3 sections from settings.
+--[Fix] Changes made to allow for download of packs.
+--[Change] Changes made to attempt to comply with Trakt 250 item limits.
+
 [B]Update - v6.7.77 - May 26th, 2026 [/B]
 --[Fix] Small fix pushed for blank My TV Shows and My Movies menus.
 

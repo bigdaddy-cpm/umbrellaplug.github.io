@@ -4273,8 +4273,8 @@ msgid "[COLOR %s][B]Hide[/B][/COLOR] %s"
 msgstr "[COLOR %s][B]Ukryć[/B][/COLOR] %s"
 
 msgctxt "#40076"
-msgid "[COLOR %s][B]Scrobbble Reset[/B][/COLOR] Item"
-msgstr "[COLOR %s][B]Resetowanie Scrobbble[/B][/COLOR] Pozycja"
+msgid "[COLOR %s][B]Scrobble Reset[/B][/COLOR] Item"
+msgstr "[COLOR %s][B]Resetowanie Scrobble[/B][/COLOR] Pozycja"
 
 msgctxt "#40077"
 msgid "Originals (TMDb)"
@@ -7058,4 +7058,44 @@ msgstr ""
 
 msgctxt "#40704"
 msgid "Prefer Smaller File Sizes"
+msgstr ""
+
+msgctxt "#40705"
+msgid "Cloud Sources First"
+msgstr ""
+
+msgctxt "#40706"
+msgid "Collection (MDBList)"
+msgstr ""
+
+msgctxt "#40707"
+msgid "Add to [COLOR %s][B]MDBList Collection[/B][/COLOR]"
+msgstr ""
+
+msgctxt "#40708"
+msgid "Remove from [COLOR %s][B]MDBList Collection[/B][/COLOR]"
+msgstr ""
+
+msgctxt "#40709"
+msgid "Collection Manager - Movies"
+msgstr ""
+
+msgctxt "#40710"
+msgid "Collection Manager - Shows"
+msgstr ""
+
+msgctxt "#40711"
+msgid "Official Lists (MDBList)"
+msgstr ""
+
+msgctxt "#40712"
+msgid "Add to [COLOR %s][B]MDBList Dropped[/B][/COLOR]"
+msgstr ""
+
+msgctxt "#40713"
+msgid "Remove from [COLOR %s][B]MDBList Dropped[/B][/COLOR]"
+msgstr ""
+
+msgctxt "#40714"
+msgid "[COLOR %s][B]Dropped Manager - Shows[/B][/COLOR]"
 msgstr ""

@@ -122,6 +122,188 @@ def delete_watchList_items(items, table, col_name='mdblist'):
 		try: dbcon.close()
 		except: pass
 
+def fetch_dropped(table):
+	list = ''
+	try:
+		dbcon = get_connection()
+		dbcur = get_connection_cursor(dbcon)
+		ck_table = dbcur.execute('''SELECT * FROM sqlite_master WHERE type='table' AND name=?;''', (table,)).fetchone()
+		if not ck_table:
+			dbcur.execute('''CREATE TABLE IF NOT EXISTS %s (title TEXT, year TEXT, premiered TEXT, imdb TEXT, tmdb TEXT, tvdb TEXT, mdblist TEXT, rating FLOAT, votes INTEGER, listed_at TEXT, UNIQUE(imdb, tmdb, tvdb, mdblist));''' % table)
+			dbcur.connection.commit()
+			return list
+		try:
+			match = dbcur.execute('''SELECT * FROM %s WHERE NOT title=""''' % table).fetchall()
+			list = [{'title': i[0], 'year': i[1], 'premiered': i[2], 'imdb': i[3], 'tmdb': i[4], 'tvdb': i[5], 'mdblist': i[6], 'rating': i[7], 'votes': i[8], 'added': i[9]} for i in match]
+		except: pass
+	except:
+		from resources.lib.modules import log_utils
+		log_utils.error()
+	finally:
+		try: dbcur.close()
+		except: pass
+		try: dbcon.close()
+		except: pass
+	return list
+
+def insert_dropped(items, table, new_sync=True):
+	try:
+		dbcon = get_connection()
+		dbcur = get_connection_cursor(dbcon)
+		dbcur.execute('''CREATE TABLE IF NOT EXISTS %s (title TEXT, year TEXT, premiered TEXT, imdb TEXT, tmdb TEXT, tvdb TEXT, mdblist TEXT, rating FLOAT, votes INTEGER, listed_at TEXT, UNIQUE(imdb, tmdb, tvdb, mdblist));''' % table)
+		dbcur.execute('''CREATE TABLE IF NOT EXISTS service (setting TEXT, value TEXT, UNIQUE(setting));''')
+		if new_sync:
+			dbcur.execute('''DELETE FROM %s''' % table)
+			dbcur.connection.commit()
+			dbcur.execute('''VACUUM''')
+		for i in items:
+			try:
+				if i is None: continue
+				title = i.get('title', '')
+				year = str(i.get('release_year', '') or i.get('year', '') or '')
+				premiered = i.get('premiered', '')
+				imdb = i.get('imdb', '')
+				tmdb = str(i.get('tmdb', '') or '')
+				tvdb = str(i.get('tvdb', '') or '')
+				mdblist = str(i.get('id', '') or i.get('mdblist', '') or '')
+				rating = i.get('rating', '')
+				votes = i.get('votes', '')
+				listed_at = i.get('added', '') or i.get('dropped_at', '')
+				dbcur.execute('''INSERT OR REPLACE INTO %s Values (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)''' % table, (title, year, premiered, imdb, tmdb, tvdb, mdblist, rating, votes, listed_at))
+			except:
+				from resources.lib.modules import log_utils
+				log_utils.error()
+		timestamp = datetime.utcnow().strftime("%Y-%m-%dT%H:%M:%S.000Z")
+		dbcur.execute('''INSERT OR REPLACE INTO service Values (?, ?)''', ('last_dropped_at', timestamp))
+		dbcur.connection.commit()
+	except:
+		from resources.lib.modules import log_utils
+		log_utils.error()
+	finally:
+		try: dbcur.close()
+		except: pass
+		try: dbcon.close()
+		except: pass
+
+def delete_dropped_items(items, table, col_name='imdb'):
+	try:
+		dbcon = get_connection()
+		dbcur = get_connection_cursor(dbcon)
+		ck_table = dbcur.execute('''SELECT * FROM sqlite_master WHERE type='table' AND name=?;''', (table,)).fetchone()
+		if not ck_table:
+			dbcur.execute('''CREATE TABLE IF NOT EXISTS %s (title TEXT, year TEXT, premiered TEXT, imdb TEXT, tmdb TEXT, tvdb TEXT, mdblist TEXT, rating FLOAT, votes INTEGER, listed_at TEXT, UNIQUE(imdb, tmdb, tvdb, mdblist));''' % table)
+			dbcur.execute('''CREATE TABLE IF NOT EXISTS service (setting TEXT, value TEXT, UNIQUE(setting));''')
+			dbcur.connection.commit()
+			return
+		for item in items:
+			try:
+				dbcur.execute('''DELETE FROM %s WHERE %s=?;''' % (table, col_name), (item,))
+			except:
+				from resources.lib.modules import log_utils
+				log_utils.error()
+		timestamp = datetime.utcnow().strftime("%Y-%m-%dT%H:%M:%S.000Z")
+		dbcur.execute('''INSERT OR REPLACE INTO service Values (?, ?)''', ('last_dropped_at', timestamp))
+		dbcur.connection.commit()
+	except:
+		from resources.lib.modules import log_utils
+		log_utils.error()
+	finally:
+		try: dbcur.close()
+		except: pass
+		try: dbcon.close()
+		except: pass
+
+def fetch_collection(table):
+	list = ''
+	try:
+		dbcon = get_connection()
+		dbcur = get_connection_cursor(dbcon)
+		ck_table = dbcur.execute('''SELECT * FROM sqlite_master WHERE type='table' AND name=?;''', (table,)).fetchone()
+		if not ck_table:
+			dbcur.execute('''CREATE TABLE IF NOT EXISTS %s (title TEXT, year TEXT, premiered TEXT, imdb TEXT, tmdb TEXT, tvdb TEXT, mdblist TEXT, rating FLOAT, votes INTEGER, listed_at TEXT, UNIQUE(imdb, tmdb, tvdb, mdblist));''' % table)
+			dbcur.connection.commit()
+			return list
+		try:
+			match = dbcur.execute('''SELECT * FROM %s WHERE NOT title=""''' % table).fetchall()
+			list = [{'title': i[0], 'year': i[1], 'premiered': i[2], 'imdb': i[3], 'tmdb': i[4], 'tvdb': i[5], 'mdblist': i[6], 'rating': i[7], 'votes': i[8], 'added': i[9]} for i in match]
+		except: pass
+	except:
+		from resources.lib.modules import log_utils
+		log_utils.error()
+	finally:
+		try: dbcur.close()
+		except: pass
+		try: dbcon.close()
+		except: pass
+	return list
+
+def insert_collection(items, table, new_sync=True):
+	try:
+		dbcon = get_connection()
+		dbcur = get_connection_cursor(dbcon)
+		dbcur.execute('''CREATE TABLE IF NOT EXISTS %s (title TEXT, year TEXT, premiered TEXT, imdb TEXT, tmdb TEXT, tvdb TEXT, mdblist TEXT, rating FLOAT, votes INTEGER, listed_at TEXT, UNIQUE(imdb, tmdb, tvdb, mdblist));''' % table)
+		dbcur.execute('''CREATE TABLE IF NOT EXISTS service (setting TEXT, value TEXT, UNIQUE(setting));''')
+		if new_sync:
+			dbcur.execute('''DELETE FROM %s''' % table)
+			dbcur.connection.commit()
+			dbcur.execute('''VACUUM''')
+		for i in items:
+			try:
+				if i is None: continue
+				title = i.get('title', '')
+				year = str(i.get('release_year', '') or '')
+				premiered = ''
+				imdb = i.get('imdb', '')
+				tmdb = str(i.get('tmdb', '') or '')
+				tvdb = str(i.get('tvdb', '') or '')
+				mdblist = str(i.get('id', '') or '')
+				rating = i.get('rating', '')
+				votes = i.get('votes', '')
+				listed_at = i.get('added', '')
+				dbcur.execute('''INSERT OR REPLACE INTO %s Values (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)''' % table, (title, year, premiered, imdb, tmdb, tvdb, mdblist, rating, votes, listed_at))
+			except:
+				from resources.lib.modules import log_utils
+				log_utils.error()
+		timestamp = datetime.utcnow().strftime("%Y-%m-%dT%H:%M:%S.000Z")
+		dbcur.execute('''INSERT OR REPLACE INTO service Values (?, ?)''', ('last_collected_at', timestamp))
+		dbcur.connection.commit()
+	except:
+		from resources.lib.modules import log_utils
+		log_utils.error()
+	finally:
+		try: dbcur.close()
+		except: pass
+		try: dbcon.close()
+		except: pass
+
+def delete_collection_items(items, table, col_name='mdblist'):
+	try:
+		dbcon = get_connection()
+		dbcur = get_connection_cursor(dbcon)
+		ck_table = dbcur.execute('''SELECT * FROM sqlite_master WHERE type='table' AND name=?;''', (table,)).fetchone()
+		if not ck_table:
+			dbcur.execute('''CREATE TABLE IF NOT EXISTS %s (title TEXT, year TEXT, premiered TEXT, imdb TEXT, tmdb TEXT, tvdb TEXT, mdblist TEXT, rating FLOAT, votes INTEGER, listed_at TEXT, UNIQUE(imdb, tmdb, tvdb, mdblist));''' % table)
+			dbcur.execute('''CREATE TABLE IF NOT EXISTS service (setting TEXT, value TEXT, UNIQUE(setting));''')
+			dbcur.connection.commit()
+			return
+		for item in items:
+			try:
+				dbcur.execute('''DELETE FROM %s WHERE %s=?;''' % (table, col_name), (item,))
+			except:
+				from resources.lib.modules import log_utils
+				log_utils.error()
+		timestamp = datetime.utcnow().strftime("%Y-%m-%dT%H:%M:%S.000Z")
+		dbcur.execute('''INSERT OR REPLACE INTO service Values (?, ?)''', ('last_collected_at', timestamp))
+		dbcur.connection.commit()
+	except:
+		from resources.lib.modules import log_utils
+		log_utils.error()
+	finally:
+		try: dbcur.close()
+		except: pass
+		try: dbcon.close()
+		except: pass
+
 def delete_mdb_tables(tables):
 	#Delete and vacuum the specified MDBList tables, and reset their service timestamps.
 	try:
@@ -137,7 +319,7 @@ def delete_mdb_tables(tables):
 				log_utils.error()
 		# Reset service timestamps so next sync is treated as first-run
 		epoch = '1970-01-01T00:00:00.000Z'
-		for key in ('last_watched_at', 'last_watched_movies_at', 'last_watched_episodes_at', 'last_watchlisted_at'):
+		for key in ('last_watched_at', 'last_watched_movies_at', 'last_watched_episodes_at', 'last_watchlisted_at', 'last_collected_at', 'last_dropped_at'):
 			dbcur.execute('''INSERT OR REPLACE INTO service Values (?, ?)''', (key, epoch))
 		dbcur.connection.commit()
 		dbcur.execute('''VACUUM''')
@@ -496,6 +678,29 @@ def clear_bookmarks():
 		dbcur = get_connection_cursor(dbcon)
 		_ensure_bookmarks_table(dbcur)
 		dbcur.execute('''DELETE FROM bookmarks''')
+		dbcur.connection.commit()
+	except:
+		from resources.lib.modules import log_utils
+		log_utils.error()
+	finally:
+		try: dbcur.close()
+		except: pass
+		try: dbcon.close()
+		except: pass
+
+def delete_synced_bookmarks_not_in(server_ids):
+	try:
+		dbcon = get_connection()
+		dbcur = get_connection_cursor(dbcon)
+		_ensure_bookmarks_table(dbcur)
+		if not server_ids:
+			dbcur.execute('''DELETE FROM bookmarks WHERE resume_id GLOB '[0-9]*' ''')
+		else:
+			placeholders = ','.join('?' * len(server_ids))
+			dbcur.execute(
+				"DELETE FROM bookmarks WHERE resume_id GLOB '[0-9]*' AND resume_id NOT IN (%s)" % placeholders,
+				list(server_ids)
+			)
 		dbcur.connection.commit()
 	except:
 		from resources.lib.modules import log_utils
