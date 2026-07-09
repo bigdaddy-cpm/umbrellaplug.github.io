@@ -1,2 +1,2 @@
-[B]Update - v6.7.79 - June 29th, 2026 [/B]
---[Fix] Fixed issue for incorrect time format causing double scrapes.
+[B]Update - v6.7.80 - July 9th, 2026 [/B]
+--[Fix] Fix for Trakt Episode progress giving reduced amount of items.
