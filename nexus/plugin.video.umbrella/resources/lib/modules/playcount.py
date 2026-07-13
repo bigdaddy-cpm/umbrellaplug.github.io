@@ -82,7 +82,7 @@ def getTVShowIndicators(refresh=False):
 		from resources.lib.modules import log_utils
 		log_utils.error()
 
-def getSeasonIndicators(imdb, tvdb, refresh=False, has_next_episode=False):
+def getSeasonIndicators(imdb, tvdb, refresh=False, has_next_episode=False, tmdb_total_aired=None):
 	try:
 		if traktIndicators:
 			timeoutsyncSeasons = trakt.timeoutsyncSeasons(imdb, tvdb)
@@ -91,12 +91,18 @@ def getSeasonIndicators(imdb, tvdb, refresh=False, has_next_episode=False):
 			elif trakt.getEpisodesWatchedActivity() < timeoutsyncSeasons: timeout = 720
 			else: timeout = 0
 			indicators = trakt.cachesyncSeasons(imdb, tvdb, timeout=timeout)
-			# Trakt live API confirmed a new episode (has_next_episode) but cache shows all watched.
-			# Force a refresh so this read and all subsequent reads across all views see the correct count.
-			if has_next_episode and timeout != 0 and indicators:
+			# Trakt live API confirmed a new episode (has_next_episode) but cache shows all watched, or
+			# TMDb's aired-episode count is higher than our cached total (tmdb_total_aired) — either way
+			# the cached counts are stale. Force a refresh so this read and all subsequent reads across
+			# all views see the correct count.
+			if timeout != 0 and indicators:
 				counts = indicators[1] if len(indicators) > 1 else {}
-				if counts and sum(v.get('total', 0) for v in counts.values()) == sum(v.get('watched', 0) for v in counts.values()):
-					indicators = trakt.cachesyncSeasons(imdb, tvdb, timeout=0)
+				if counts:
+					cached_total = sum(v.get('total', 0) for v in counts.values())
+					stale = (has_next_episode and cached_total == sum(v.get('watched', 0) for v in counts.values())) or \
+						(tmdb_total_aired and int(tmdb_total_aired) > cached_total)
+					if stale:
+						indicators = trakt.cachesyncSeasons(imdb, tvdb, timeout=0)
 			return indicators
 		elif simklIndicators:
 			timeoutsyncSeasons = simkl.timeoutsyncSeasons(imdb, tvdb)
@@ -105,21 +111,30 @@ def getSeasonIndicators(imdb, tvdb, refresh=False, has_next_episode=False):
 			elif simkl.getEpisodesWatchedActivity() < timeoutsyncSeasons: timeout = 720
 			else: timeout = 0
 			indicators = simkl.cachesyncSeasons(imdb, tvdb, timeout=timeout)
-			# Simkl progress confirmed a new episode (has_next_episode) but cache shows all watched.
-			# Force a refresh so this read and all subsequent reads across all views see the correct count.
-			if has_next_episode and timeout != 0 and indicators:
+			# Simkl progress confirmed a new episode (has_next_episode) but cache shows all watched, or
+			# TMDb's aired-episode count is higher than our cached total (tmdb_total_aired) — either way
+			# the cached counts are stale. Force a refresh so this read and all subsequent reads across
+			# all views see the correct count.
+			if timeout != 0 and indicators:
 				counts = indicators[1] if len(indicators) > 1 else {}
-				if counts and sum(v.get('total', 0) for v in counts.values()) == sum(v.get('watched', 0) for v in counts.values()):
-					indicators = simkl.cachesyncSeasons(imdb, tvdb, timeout=0)
+				if counts:
+					cached_total = sum(v.get('total', 0) for v in counts.values())
+					stale = (has_next_episode and cached_total == sum(v.get('watched', 0) for v in counts.values())) or \
+						(tmdb_total_aired and int(tmdb_total_aired) > cached_total)
+					if stale:
+						indicators = simkl.cachesyncSeasons(imdb, tvdb, timeout=0)
 			return indicators
 		elif mdblistIndicators:
 			# syncSeasons derives totals from TMDb season meta (96h cache) — always fetch fresh from local DB
 			indicators = mdblist.cachesyncSeasons(imdb, tvdb, timeout=0)
-			# MDBList progress confirmed a new episode (has_next_episode) but counts show all watched.
+			# MDBList progress confirmed a new episode (has_next_episode), or TMDb's aired-episode count is
+			# higher than our cached total (tmdb_total_aired), but counts show all watched.
 			# TMDb season meta may be stale — force-refresh it so syncSeasons picks up the new episode total.
-			if has_next_episode and indicators:
-				counts = indicators[1] if len(indicators) > 1 else {}
-				if counts and sum(v.get('total', 0) for v in counts.values()) == sum(v.get('watched', 0) for v in counts.values()):
+			counts = indicators[1] if indicators and len(indicators) > 1 else {}
+			cached_total = sum(v.get('total', 0) for v in counts.values()) if counts else 0
+			stale = has_next_episode or (tmdb_total_aired and int(tmdb_total_aired) > cached_total)
+			if stale and indicators:
+				if counts and sum(v.get('watched', 0) for v in counts.values()) == cached_total:
 					try:
 						from resources.lib.database import cache as _cache
 						from resources.lib.indexers import tmdb as _tmdb

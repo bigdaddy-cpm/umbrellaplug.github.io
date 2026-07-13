@@ -172,7 +172,7 @@ class Seasons:
 		multi = True if len([x for y,x in enumerate(multi) if x not in multi[:y]]) > 1 else False
 		if items:
 			imdb, tmdb, tvdb = items[0]['imdb'], items[0]['tmdb'], items[0]['tvdb']
-			try: indicators = getSeasonIndicators(imdb, tvdb)
+			try: indicators = getSeasonIndicators(imdb, tvdb, tmdb_total_aired=items[0].get('total_aired_episodes'))
 			except: indicators = None
 		for i in items:
 			try:

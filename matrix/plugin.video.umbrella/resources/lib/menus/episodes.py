@@ -293,7 +293,7 @@ class Episodes:
 					showSeasons = cache.get(tmdb_indexer().get_showSeasons_meta, 96, tmdb_id)
 					if not showSeasons:
 						return
-					seasonEpisodes = cache.get(tmdb_indexer().get_seasonEpisodes_meta, 96, tmdb_id, season)
+					seasonEpisodes = tmdb_indexer().get_seasonEpisodes_meta_checked(tmdb_id, season)
 					if not seasonEpisodes:
 						return
 					episode_list = seasonEpisodes.get('episodes', [])
@@ -667,7 +667,7 @@ class Episodes:
 				next_episode_num = i['enum']
 				if next_season_num > showSeasons['total_seasons']: return
 				if not self.showspecials and next_season_num == 0: return
-				seasonEpisodes = cache.get(tmdb_indexer().get_seasonEpisodes_meta, 96, tmdb, next_season_num)
+				seasonEpisodes = tmdb_indexer().get_seasonEpisodes_meta_checked(tmdb, next_season_num)
 				if not seasonEpisodes: return
 				seasonEpisodes = dict((k, v) for k, v in iter(seasonEpisodes.items()) if v is not None and v != '')
 				try: episode_meta = [x for x in seasonEpisodes.get('episodes') if x.get('episode') == next_episode_num][0]
@@ -773,7 +773,7 @@ class Episodes:
 								break
 						if next_season is not None: break
 					if next_season is None: return  # fully watched
-					seasonEpisodes = cache.get(tmdb_indexer().get_seasonEpisodes_meta, 96, tmdb_id, next_season)
+					seasonEpisodes = tmdb_indexer().get_seasonEpisodes_meta_checked(tmdb_id, next_season)
 					if not seasonEpisodes: return
 					episode_list = seasonEpisodes.get('episodes', [])
 					try: episode_meta = [x for x in episode_list if x.get('episode') == next_episode][0]
@@ -1004,7 +1004,7 @@ class Episodes:
 				next_season_num = i['snum'] if next_episode_num == i['enum'] + 1 else i['snum'] + 1
 				if next_season_num > showSeasons['total_seasons']: return
 				if not self.showspecials and next_season_num == 0: return
-				seasonEpisodes = cache.get(tmdb_indexer().get_seasonEpisodes_meta, 96, tmdb, next_season_num)
+				seasonEpisodes = tmdb_indexer().get_seasonEpisodes_meta_checked(tmdb, next_season_num)
 				if not seasonEpisodes: return
 				seasonEpisodes = dict((k,v) for k, v in iter(seasonEpisodes.items()) if v is not None and v != '') # remove empty keys so .update() doesn't over-write good meta with empty values.
 				try: episode_meta = [x for x in seasonEpisodes.get('episodes') if x.get('episode') == next_episode_num][0] # to pull just the episode meta we need
@@ -1175,7 +1175,7 @@ class Episodes:
 			tmdb, tvdb = i['tmdb'], i['tvdb']
 			try:
 				itemyear = tmdb_indexer().get_showSeasons_meta(tmdb)
-				seasonEpisodes = cache.get(tmdb_indexer().get_seasonEpisodes_meta, 96, tmdb, i['season'])
+				seasonEpisodes = tmdb_indexer().get_seasonEpisodes_meta_checked(tmdb, i['season'])
 				if not seasonEpisodes: return
 				try: episode_meta = [x for x in seasonEpisodes.get('episodes') if x.get('episode') == i['episode']][0] # to pull just the episode meta we need
 				except: return
@@ -1219,7 +1219,7 @@ class Episodes:
 			tmdb, tvdb = i[3].get('tmdb'), i[3].get('tvdb')
 			try:
 				itemyear = tmdb_indexer().get_showSeasons_meta(tmdb)
-				seasonEpisodes = cache.get(tmdb_indexer().get_seasonEpisodes_meta, 96, tmdb, i[3].get('season'))
+				seasonEpisodes = tmdb_indexer().get_seasonEpisodes_meta_checked(tmdb, i[3].get('season'))
 				if not seasonEpisodes: return
 				try: episode_meta = [x for x in seasonEpisodes.get('episodes') if int(x.get('episode')) == int(i[3].get('episode'))][0] # to pull just the episode meta we need
 				except: return
@@ -1389,7 +1389,7 @@ class Episodes:
 				next_season_num = i['snum'] if next_episode_num == i['enum'] + 1 else i['snum'] + 1
 				if next_season_num > showSeasons['total_seasons']: return
 				if not self.showspecials and next_season_num == 0: return
-				seasonEpisodes = cache.get(tmdb_indexer().get_seasonEpisodes_meta, 96, tmdb, next_season_num)
+				seasonEpisodes = tmdb_indexer().get_seasonEpisodes_meta_checked(tmdb, next_season_num)
 				if not seasonEpisodes: return
 				seasonEpisodes = dict((k,v) for k, v in iter(seasonEpisodes.items()) if v is not None and v != '') # remove empty keys so .update() doesn't over-write good meta with empty values.
 				try: episode_meta = [x for x in seasonEpisodes.get('episodes') if x.get('episode') == next_episode_num][0] # to pull just the episode meta we need
@@ -1787,7 +1787,7 @@ class Episodes:
 				if isMultiList and multi_unwatchedEnabled:
 					if 'ForceAirEnabled' not in i:
 						try:
-							try: count = getShowCount(getSeasonIndicators(imdb, tvdb, has_next_episode=i.get('has_next_episode', False))[1], imdb, tvdb) # if indicators and no matching imdb_id in watched items then it returns None and we use TMDb meta to avoid Trakt request
+							try: count = getShowCount(getSeasonIndicators(imdb, tvdb, has_next_episode=i.get('has_next_episode', False), tmdb_total_aired=meta.get('total_aired_episodes'))[1], imdb, tvdb) # if indicators and no matching imdb_id in watched items then it returns None and we use TMDb meta to avoid Trakt request
 							except: count = None
 							if count:
 								total_aired = int(meta.get('total_aired_episodes') or 0)

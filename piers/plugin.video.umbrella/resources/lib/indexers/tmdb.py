@@ -1021,6 +1021,25 @@ class TVshows(TMDb):
 			log_utils.error()
 		return meta
 
+	def get_seasonEpisodes_meta_checked(self, tmdb, season):
+		# cache.get() wrapper for get_seasonEpisodes_meta(): the 96h cached blob may have been written
+		# while an episode was unaired (no TMDb runtime yet). Force a fresh fetch when that's still true
+		# for an episode that has since aired, so duration doesn't stay blank for the full cache window.
+		seasonEpisodes = cache.get(self.get_seasonEpisodes_meta, 96, tmdb, season)
+		if seasonEpisodes and self._season_missing_runtime(seasonEpisodes):
+			seasonEpisodes = cache.get(self.get_seasonEpisodes_meta, 0, tmdb, season)
+		return seasonEpisodes
+
+	def _season_missing_runtime(self, seasonEpisodes):
+		try:
+			today = int(re.sub(r'[^0-9]', '', str(self.today_date)))
+			for ep in seasonEpisodes.get('episodes', []):
+				premiered = ep.get('premiered')
+				if not premiered or ep.get('duration'): continue
+				if int(re.sub(r'[^0-9]', '', str(premiered))) <= today: return True
+			return False
+		except: return False
+
 	def get_episodes_request(self, tmdb, season, episode): # Don't think I'll use this at all
 		if not tmdb and not season and not episode: return None
 		try:

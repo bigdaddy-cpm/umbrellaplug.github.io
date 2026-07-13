@@ -2461,7 +2461,7 @@ class TVshows:
 							else: continue
 					except: pass
 				
-				try: indicators = getSeasonIndicators(imdb, tvdb, has_next_episode=i.get('has_next_episode', False))
+				try: indicators = getSeasonIndicators(imdb, tvdb, has_next_episode=i.get('has_next_episode', False), tmdb_total_aired=i.get('total_aired_episodes'))
 				except: indicators = None
 				meta = dict((k, v) for k, v in iter(i.items()) if v is not None and v != '')
 				meta.update({'code': imdb, 'imdbnumber': imdb, 'mediatype': 'tvshow', 'tag': [imdb, tmdb]}) # "tag" and "tagline" for movies only, but works in my skin mod so leave

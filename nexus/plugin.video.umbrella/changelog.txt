@@ -1,2 +1,2 @@
-[B]Update - v6.7.80 - July 9th, 2026 [/B]
---[Fix] Fix for Trakt Episode progress giving reduced amount of items.
+[B]Update - v6.7.81 - July 13th, 2026 [/B]
+--[Fix] Fix to clear cache on show episode and season counts when episode count does not match cache.
