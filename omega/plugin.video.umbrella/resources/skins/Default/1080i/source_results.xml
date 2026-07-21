@@ -301,7 +301,7 @@
 						<aligny>center</aligny>
 						<aspectratio>keep</aspectratio>
 						<texture>$INFO[ListItem.Property(umbrella.quality_icon)]</texture>
-						<visible>String.IsEqual(Window().Property(umbrella.usecoloricons),0)</visible>
+						<visible>String.IsEqual(Window().Property(umbrella.usecoloricons),0) | String.IsEqual(ListItem.Property(umbrella.provider),AIOSTREAMS)</visible>
 					</control>
 					<control type="label">
 						<description>Line1 link name</description>
@@ -433,7 +433,7 @@
 						<align>left</align>
 						<aspectratio>keep</aspectratio>
 						<texture>$INFO[ListItem.Property(umbrella.quality_icon)]</texture>
-						<visible>String.IsEqual(Window().Property(umbrella.usecoloricons),0)</visible>
+						<visible>String.IsEqual(Window().Property(umbrella.usecoloricons),0) | String.IsEqual(ListItem.Property(umbrella.provider),AIOSTREAMS)</visible>
 					</control>
 					<control type="image">
 						<description>Quality Icon RD</description>
