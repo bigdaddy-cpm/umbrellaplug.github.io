@@ -903,7 +903,7 @@ class Sources:
 		try:
 			sources = []
 			db_movie = dbcur.execute('''SELECT * FROM rel_src WHERE (source=? AND imdb_id=? AND season='' AND episode='')''', (source, imdb)).fetchone()
-			if db_movie:
+			if db_movie and source != 'aiostreams': # AIOStreams direct URLs may be short-lived/signed
 				timestamp = cleandate.datetime_from_string(str(db_movie[5]), '%Y-%m-%d %H:%M:%S.%f', False)
 				db_movie_valid = abs(self.time - timestamp) < single_expiry
 				if db_movie_valid:
@@ -915,9 +915,10 @@ class Sources:
 			sources = call().sources(data, self.hostprDict)
 			if sources:
 				self.scraper_sources.extend(sources)
-				dbcur.execute('''INSERT OR REPLACE INTO rel_aliases Values (?, ?)''', (data.get('title', ''), repr(data.get('aliases', ''))))
-				dbcur.execute('''INSERT OR REPLACE INTO rel_src Values (?, ?, ?, ?, ?, ?)''', (source, imdb, '', '', repr(sources), datetime.now().strftime("%Y-%m-%d %H:%M:%S.%f")))
-				dbcur.connection.commit()
+				if source != 'aiostreams':
+					dbcur.execute('''INSERT OR REPLACE INTO rel_aliases Values (?, ?)''', (data.get('title', ''), repr(data.get('aliases', ''))))
+					dbcur.execute('''INSERT OR REPLACE INTO rel_src Values (?, ?, ?, ?, ?, ?)''', (source, imdb, '', '', repr(sources), datetime.now().strftime("%Y-%m-%d %H:%M:%S.%f")))
+					dbcur.connection.commit()
 		except: log_utils.error()
 
 	def getEpisodeSource(self, imdb, season, episode, data, source, call, pack):
@@ -940,7 +941,7 @@ class Sources:
 		if not pack: # singleEpisodes db check
 			try:
 				db_singleEpisodes = dbcur.execute('''SELECT * FROM rel_src WHERE (source=? AND imdb_id=? AND season=? AND episode=?)''', (source, imdb, season, episode)).fetchone()
-				if db_singleEpisodes:
+				if db_singleEpisodes and source != 'aiostreams': # AIOStreams direct URLs may be short-lived/signed
 					timestamp = cleandate.datetime_from_string(str(db_singleEpisodes[5]), '%Y-%m-%d %H:%M:%S.%f', False)
 					db_singleEpisodes_valid = abs(self.time - timestamp) < single_expiry
 					if db_singleEpisodes_valid:
@@ -979,8 +980,9 @@ class Sources:
 				sources = []
 				sources = call().sources(data, self.hostprDict)
 				if sources:
-					dbcur.execute('''INSERT OR REPLACE INTO rel_src Values (?, ?, ?, ?, ?, ?)''', (source, imdb, season, episode, repr(sources), datetime.now().strftime("%Y-%m-%d %H:%M:%S.%f")))
-					dbcur.connection.commit()
+					if source != 'aiostreams':
+						dbcur.execute('''INSERT OR REPLACE INTO rel_src Values (?, ?, ?, ?, ?, ?)''', (source, imdb, season, episode, repr(sources), datetime.now().strftime("%Y-%m-%d %H:%M:%S.%f")))
+						dbcur.connection.commit()
 					return self.scraper_sources.extend(sources)
 				return
 			except: return log_utils.error()
@@ -1117,6 +1119,8 @@ class Sources:
 
 		if getSetting('easynews.enable') == 'true':
 			directstart.extend([i for i in direct if i['provider'] == 'easynews'])
+		if getSetting('aiostreams.enable') == 'true':
+			directstart.extend([i for i in direct if i['provider'] == 'aiostreams'])
 		if getSetting('plexshare.enable') == 'true':
 			directstart.extend([i for i in direct if i['provider'] == 'plexshare'])
 		if getSetting('gdrive.enable') == 'true':
@@ -1156,6 +1160,7 @@ class Sources:
 			'tb_cloud': 'TorBox',
 			'oc_cloud': 'Offcloud',
 			'easynews': 'easynews',
+			'aiostreams': 'aiostreams',
 			'gdrive': 'gdrive',
 			'plexshare': 'plexshare',
 			'filepursuit': 'filepursuit',
@@ -1735,6 +1740,7 @@ class Sources:
 			except: pass
 		else: self.debrid_service, self.debrid_token = '', ''
 		self.prem_providers = [] # for sorting by debrid and direct source links priority
+		if control.setting('aiostreams.uuid'): self.prem_providers += [('aiostreams', int(getSetting('aiostreams.priority') or '1'))]
 		if control.setting('easynews.user'): self.prem_providers += [('easynews', int(getSetting('easynews.priority')))]
 		if control.setting('filepursuittoken'): self.prem_providers += [('filepursuit', int(getSetting('filepursuit.priority')))]
 		#if control.setting('furk.user_name'): self.prem_providers += [('furk', int(getSetting('furk.priority')))]

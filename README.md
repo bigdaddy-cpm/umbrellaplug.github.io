@@ -5,7 +5,7 @@ Welcome to the umbrellaplug.github.io
 Compatible with Kodi 19, 20, and 21.
 
 ## Current Versions:
-Umbrella - 6.7.81
+Umbrella - 6.7.82
 Umbrella Repo - 2.2.6
 
 ## Installation Instructions:
@@ -43,6 +43,13 @@ Currently Supported Other Providers:
 - Easynews
 - Plex
 - Google Drive
+- AIOStreams (resolved HTTP/debrid streams)
+
+### AIOStreams Setup
+
+Configure and save your user in the AIOStreams web interface. In Umbrella, open **Settings > Providers > AIOStreams**, enable it, select the instance, and enter your AIOStreams UUID and password. **ElfHosted** uses `https://aiostreams.elfhosted.com`; select **Custom** to enter a different self-hosted or private instance URL.
+
+Umbrella uses AIOStreams' authenticated Search API to request movie and episode results by IMDb ID. Results containing resolved HTTP(S) URLs are added to Umbrella's normal source list; P2P-only `infoHash`, YouTube, and external-page results are ignored.
 
 **The plugin will not work without at least 1 of these types of accounts**
 
