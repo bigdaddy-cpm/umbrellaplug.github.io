@@ -4,7 +4,7 @@
 from urllib.parse import urlencode
 import requests
 from resources.lib.modules.control import setting as getSetting
-from resources.lib.modules import log_utils, scrape_utils
+from resources.lib.modules import log_utils, scrape_utils, source_utils
 
 class source:
 	priority = 1
@@ -39,6 +39,8 @@ class source:
 		description = stream.get('description') or stream.get('title') or stream.get('name') or ''
 		name_info = scrape_utils.clean_name('%s %s' % (name, description))
 		quality, info = scrape_utils.get_release_quality(name_info, url)
+		media_info = source_utils.getFileType(name_info.lower(), url)
+		if media_info: info.extend(item.strip() for item in media_info.split('/') if item.strip())
 		try:
 			size, label = scrape_utils.convert_size(float(stream.get('size') or hints.get('videoSize') or (stream.get('streamData') or {}).get('size') or 0), to='GB')
 			if label: info.insert(0, label)

@@ -1,3 +1,6 @@
+[B]Update - v6.7.86 - July 20th, 2026 [/B]
+--[Fix] Add media-format and audio badges to AIOStreams results.
+
 [B]Update - v6.7.85 - July 20th, 2026 [/B]
 --[Fix] Display the originating AIOStreams add-on as the source name.
 
