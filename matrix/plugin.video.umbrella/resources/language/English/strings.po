@@ -5791,3 +5791,27 @@ msgstr ""
 msgctxt "#40714"
 msgid "[COLOR %s][B]Dropped Manager - Shows[/B][/COLOR]"
 msgstr ""
+
+msgctxt "#40715"
+msgid "AIOStreams"
+msgstr ""
+
+msgctxt "#40716"
+msgid "Enable AIOStreams"
+msgstr ""
+
+msgctxt "#40717"
+msgid "AIOStreams Instance"
+msgstr ""
+
+msgctxt "#40718"
+msgid "Custom Instance URL"
+msgstr ""
+
+msgctxt "#40719"
+msgid "AIOStreams UUID"
+msgstr ""
+
+msgctxt "#40720"
+msgid "AIOStreams Password"
+msgstr ""

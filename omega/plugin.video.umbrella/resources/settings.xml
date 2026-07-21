@@ -4654,33 +4654,33 @@
 			</group>
 		</category>
 		<category id="Providers" label="40362" help="40191">
-			<group id="aiostreams" label="AIOStreams">
-				<setting id="aiostreams.enable" type="boolean" label="Enable AIOStreams" help="">
+			<group id="aiostreams" label="40715">
+				<setting id="aiostreams.enable" type="boolean" label="40716" help="">
 					<level>0</level>
 					<default>false</default>
 					<control type="toggle"/>
 				</setting>
-				<setting id="aiostreams.instance" type="string" label="AIOStreams instance" help="" parent="aiostreams.enable">
+				<setting id="aiostreams.instance" type="string" label="40717" help="" parent="aiostreams.enable">
 					<level>0</level>
 					<default>ElfHosted</default>
 					<constraints><options><option>ElfHosted</option><option>Custom</option></options></constraints>
 					<dependencies><dependency type="visible"><condition operator="is" setting="aiostreams.enable">true</condition></dependency></dependencies>
-					<control type="list" format="string"><heading>AIOStreams instance</heading></control>
+					<control type="list" format="string"><heading>40717</heading></control>
 				</setting>
-				<setting id="aiostreams.custom_url" type="string" label="Custom instance URL" help="" parent="aiostreams.enable">
+				<setting id="aiostreams.custom_url" type="string" label="40718" help="" parent="aiostreams.enable">
 					<level>0</level><default/><constraints><allowempty>true</allowempty></constraints>
 					<dependencies><dependency type="visible"><and><condition operator="is" setting="aiostreams.enable">true</condition><condition operator="is" setting="aiostreams.instance">Custom</condition></and></dependency></dependencies>
-					<control type="edit" format="string"><heading>Custom AIOStreams instance URL</heading></control>
+					<control type="edit" format="string"><heading>40718</heading></control>
 				</setting>
-				<setting id="aiostreams.uuid" type="string" label="AIOStreams UUID" help="" parent="aiostreams.enable">
+				<setting id="aiostreams.uuid" type="string" label="40719" help="" parent="aiostreams.enable">
 					<level>0</level><default/><constraints><allowempty>true</allowempty></constraints>
 					<dependencies><dependency type="visible"><condition operator="is" setting="aiostreams.enable">true</condition></dependency></dependencies>
-					<control type="edit" format="string"><heading>AIOStreams UUID</heading></control>
+					<control type="edit" format="string"><heading>40719</heading></control>
 				</setting>
-				<setting id="aiostreams.password" type="string" label="AIOStreams password" help="" parent="aiostreams.enable">
+				<setting id="aiostreams.password" type="string" label="40720" help="" parent="aiostreams.enable">
 					<level>0</level><default/><constraints><allowempty>true</allowempty></constraints>
 					<dependencies><dependency type="visible"><condition operator="is" setting="aiostreams.enable">true</condition></dependency></dependencies>
-					<control type="edit" format="string"><heading>AIOStreams password</heading><hidden>true</hidden></control>
+					<control type="edit" format="string"><heading>40720</heading><hidden>true</hidden></control>
 				</setting>
 				<setting id="aiostreams.priority" type="integer" label="40005" help="">
 					<level>0</level>

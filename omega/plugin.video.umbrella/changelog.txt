@@ -1,2 +1,2 @@
-[B]Update - v6.7.82 - July 20th, 2026 [/B]
---[Change] Added AIOStreams integration with ElfHosted and custom instance support.
+[B]Update - v6.7.83 - July 20th, 2026 [/B]
+--[Fix] Added localized labels for AIOStreams settings.
