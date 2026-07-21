@@ -43,4 +43,5 @@ class source:
 			size, label = scrape_utils.convert_size(float(stream.get('size') or hints.get('videoSize') or (stream.get('streamData') or {}).get('size') or 0), to='GB')
 			if label: info.insert(0, label)
 		except Exception: size = 0
-		return {'provider': 'aiostreams', 'source': 'direct', 'name': name, 'name_info': name_info, 'quality': quality, 'language': 'en', 'url': url, 'info': ' | '.join(info), 'direct': True, 'debridonly': False, 'size': size}
+		source_name = stream.get('addon') or 'direct'
+		return {'provider': 'aiostreams', 'source': source_name, 'name': name, 'name_info': name_info, 'quality': quality, 'language': 'en', 'url': url, 'info': ' | '.join(info), 'direct': True, 'debridonly': False, 'size': size}

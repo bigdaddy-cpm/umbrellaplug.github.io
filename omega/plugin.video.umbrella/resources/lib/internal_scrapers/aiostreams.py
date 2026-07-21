@@ -61,8 +61,9 @@ class source:
 			if size_label: info.insert(0, size_label)
 		except Exception: size = 0
 		info = ' | '.join(info)
+		source_name = stream.get('addon') or 'direct'
 		return {
-			'provider': 'aiostreams', 'source': 'direct', 'name': name,
+			'provider': 'aiostreams', 'source': source_name, 'name': name,
 			'name_info': name_info, 'quality': quality, 'language': 'en',
 			'url': url, 'info': info, 'direct': True, 'debridonly': False,
 			'size': size

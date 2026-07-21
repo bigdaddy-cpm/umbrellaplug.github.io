@@ -1,4 +1,4 @@
-<addon id="plugin.video.umbrella" name="Umbrella" provider-name="Umbrella" version="6.7.84">
+<addon id="plugin.video.umbrella" name="Umbrella" provider-name="Umbrella" version="6.7.85">
 	<requires>
 		<import addon="xbmc.python" version="3.0.0" />
 		<import addon="script.module.requests" />
@@ -234,8 +234,8 @@
 			<screenshot>resources/screenshots/screenshot003.jpg</screenshot>
 		</assets>
 		<news>
-[B]Update - v6.7.84 - July 20th, 2026 [/B]
---[Fix] Switched the AIOStreams preset to MidnightIgnite Stable and updated Search API result parsing.
+[B]Update - v6.7.85 - July 20th, 2026 [/B]
+--[Fix] Display the originating AIOStreams add-on as the source name.
 		</news>
 	</extension>
 
