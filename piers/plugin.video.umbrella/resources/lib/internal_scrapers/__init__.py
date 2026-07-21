@@ -25,11 +25,14 @@ def internalSources():
 		return []
 
 def enabledCheck(scraper):
-	parent_dict = {'plexshare': 'plexshare', 'easynews':'easynews', 'filepursuit': 'filepursuit', 'gdrive':'gdrive'}
+	parent_dict = {'aiostreams': 'aiostreams', 'plexshare': 'plexshare', 'easynews':'easynews', 'filepursuit': 'filepursuit', 'gdrive':'gdrive'}
 	try:
 		parent_setting = parent_dict[scraper]
 		#log_utils.log('internal scraper token check: %s ' % (parent_setting), level=log_utils.LOGDEBUG)
-		if parent_setting == 'easynews':
+		if parent_setting == 'aiostreams':
+			if not getSetting('aiostreams.uuid') or not getSetting('aiostreams.password'): return False
+			if getSetting('aiostreams.instance') == 'Custom' and not getSetting('aiostreams.custom_url'): return False
+		elif parent_setting == 'easynews':
 			pass
 		else:
 			if not getSetting(parent_setting + 'token'): return False
