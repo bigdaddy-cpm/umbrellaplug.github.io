@@ -1,3 +1,6 @@
+[B]Update - v6.7.84 - July 20th, 2026 [/B]
+--[Fix] Switched the AIOStreams preset to MidnightIgnite Stable and updated Search API result parsing.
+
 [B]Update - v6.7.83 - July 20th, 2026 [/B]
 --[Fix] Added localized labels for AIOStreams settings.
 

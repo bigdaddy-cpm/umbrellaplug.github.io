@@ -34,7 +34,7 @@ class source:
 			return []
 
 	def _search_request(self, data):
-		base = 'https://aiostreams.elfhosted.com' if getSetting('aiostreams.instance') != 'Custom' else getSetting('aiostreams.custom_url').strip().rstrip('/')
+		base = 'https://aiostreamsfortheweebsstable.midnightignite.me' if getSetting('aiostreams.instance') != 'Custom' else getSetting('aiostreams.custom_url').strip().rstrip('/')
 		if 'tvshowtitle' in data:
 			media_type = 'series'
 			video_id = '%s:%s:%s' % (data['imdb'], data['season'], data['episode'])
@@ -47,15 +47,15 @@ class source:
 		url = stream.get('url')
 		if not url or not url.lower().startswith(('http://', 'https://')): return None
 		hints = stream.get('behaviorHints') or {}
-		request_headers = (hints.get('proxyHeaders') or {}).get('request') or {}
+		request_headers = stream.get('requestHeaders') or (hints.get('proxyHeaders') or {}).get('request') or {}
 		if request_headers:
 			url = '%s|%s' % (url, urlencode(request_headers))
 
-		name = hints.get('filename') or stream.get('name') or stream.get('title') or 'AIOStreams'
+		name = stream.get('filename') or hints.get('filename') or stream.get('name') or stream.get('title') or 'AIOStreams'
 		description = stream.get('description') or stream.get('title') or stream.get('name') or ''
 		name_info = scrape_utils.clean_name('%s %s' % (name, description))
 		quality, info = scrape_utils.get_release_quality(name_info, url)
-		size_bytes = hints.get('videoSize') or (stream.get('streamData') or {}).get('size') or 0
+		size_bytes = stream.get('size') or hints.get('videoSize') or (stream.get('streamData') or {}).get('size') or 0
 		try:
 			size, size_label = scrape_utils.convert_size(float(size_bytes), to='GB')
 			if size_label: info.insert(0, size_label)

@@ -47,7 +47,7 @@ Currently Supported Other Providers:
 
 ### AIOStreams Setup
 
-Configure and save your user in the AIOStreams web interface. In Umbrella, open **Settings > Providers > AIOStreams**, enable it, select the instance, and enter your AIOStreams UUID and password. **ElfHosted** uses `https://aiostreams.elfhosted.com`; select **Custom** to enter a different self-hosted or private instance URL.
+Configure and save your user in the AIOStreams web interface. In Umbrella, open **Settings > Providers > AIOStreams**, enable it, select the instance, and enter your AIOStreams UUID and password. **MidnightIgnite Stable** uses `https://aiostreamsfortheweebsstable.midnightignite.me`; select **Custom** to enter a different self-hosted or private instance URL.
 
 Umbrella uses AIOStreams' authenticated Search API to request movie and episode results by IMDb ID. Results containing resolved HTTP(S) URLs are added to Umbrella's normal source list; P2P-only `infoHash`, YouTube, and external-page results are ignored.
 

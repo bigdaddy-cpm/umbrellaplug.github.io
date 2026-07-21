@@ -25,7 +25,7 @@ class source:
 			log_utils.error('AIOStreams request failed: ')
 			return []
 	def _search_request(self, data):
-		base = 'https://aiostreams.elfhosted.com' if getSetting('aiostreams.instance') != 'Custom' else getSetting('aiostreams.custom_url').strip().rstrip('/')
+		base = 'https://aiostreamsfortheweebsstable.midnightignite.me' if getSetting('aiostreams.instance') != 'Custom' else getSetting('aiostreams.custom_url').strip().rstrip('/')
 		media_type = 'series' if 'tvshowtitle' in data else 'movie'
 		video_id = '%s:%s:%s' % (data['imdb'], data['season'], data['episode']) if media_type == 'series' else data['imdb']
 		return '%s/api/v1/search' % base, {'type': media_type, 'id': video_id, 'format': 'true'}
@@ -33,14 +33,14 @@ class source:
 		url = stream.get('url')
 		if not url or not url.lower().startswith(('http://', 'https://')): return None
 		hints = stream.get('behaviorHints') or {}
-		headers = (hints.get('proxyHeaders') or {}).get('request') or {}
+		headers = stream.get('requestHeaders') or (hints.get('proxyHeaders') or {}).get('request') or {}
 		if headers: url = '%s|%s' % (url, urlencode(headers))
-		name = hints.get('filename') or stream.get('name') or stream.get('title') or 'AIOStreams'
+		name = stream.get('filename') or hints.get('filename') or stream.get('name') or stream.get('title') or 'AIOStreams'
 		description = stream.get('description') or stream.get('title') or stream.get('name') or ''
 		name_info = scrape_utils.clean_name('%s %s' % (name, description))
 		quality, info = scrape_utils.get_release_quality(name_info, url)
 		try:
-			size, label = scrape_utils.convert_size(float(hints.get('videoSize') or (stream.get('streamData') or {}).get('size') or 0), to='GB')
+			size, label = scrape_utils.convert_size(float(stream.get('size') or hints.get('videoSize') or (stream.get('streamData') or {}).get('size') or 0), to='GB')
 			if label: info.insert(0, label)
 		except Exception: size = 0
 		return {'provider': 'aiostreams', 'source': 'direct', 'name': name, 'name_info': name_info, 'quality': quality, 'language': 'en', 'url': url, 'info': ' | '.join(info), 'direct': True, 'debridonly': False, 'size': size}

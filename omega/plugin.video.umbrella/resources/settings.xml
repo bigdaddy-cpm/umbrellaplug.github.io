@@ -4662,8 +4662,8 @@
 				</setting>
 				<setting id="aiostreams.instance" type="string" label="40717" help="" parent="aiostreams.enable">
 					<level>0</level>
-					<default>ElfHosted</default>
-					<constraints><options><option>ElfHosted</option><option>Custom</option></options></constraints>
+					<default>MidnightIgnite Stable</default>
+					<constraints><options><option>MidnightIgnite Stable</option><option>Custom</option></options></constraints>
 					<dependencies><dependency type="visible"><condition operator="is" setting="aiostreams.enable">true</condition></dependency></dependencies>
 					<control type="list" format="string"><heading>40717</heading></control>
 				</setting>
