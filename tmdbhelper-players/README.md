@@ -13,3 +13,4 @@ If matching files exist in `reconfigured_players`, remove or reset those copies 
 - Source Select passes `select=0` to Umbrella.
 - Autoplay passes `select=1` to Umbrella.
 - Both use `is_resolvable=false` because Umbrella manages playback through its own source workflow.
+- Both pass compact title, artwork, plot, and date metadata for Umbrella's source-results window.
