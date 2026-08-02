@@ -1,2 +1,2 @@
-[B]Update - v6.7.86 - July 20th, 2026 [/B]
---[Fix] Add media-format and audio badges to AIOStreams results.
+[B]Update - v6.7.90 - August 2nd, 2026 [/B]
+--[New] Add ElfHosted Public, Yeb Stable, and MidnightIgnite Stable AIOStreams instance presets.

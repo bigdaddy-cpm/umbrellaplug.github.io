@@ -4663,7 +4663,7 @@
 				<setting id="aiostreams.instance" type="string" label="40717" help="" parent="aiostreams.enable">
 					<level>0</level>
 					<default>MidnightIgnite Stable</default>
-					<constraints><options><option>MidnightIgnite Stable</option><option>Custom</option></options></constraints>
+					<constraints><options><option>ElfHosted Public</option><option>Yeb Stable</option><option>MidnightIgnite Stable</option><option>Custom</option></options></constraints>
 					<dependencies><dependency type="visible"><condition operator="is" setting="aiostreams.enable">true</condition></dependency></dependencies>
 					<control type="list" format="string"><heading>40717</heading></control>
 				</setting>

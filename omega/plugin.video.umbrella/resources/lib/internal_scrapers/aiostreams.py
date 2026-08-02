@@ -35,7 +35,13 @@ class source:
 			return []
 
 	def _search_request(self, data):
-		base = 'https://aiostreamsfortheweebsstable.midnightignite.me' if getSetting('aiostreams.instance') != 'Custom' else getSetting('aiostreams.custom_url').strip().rstrip('/')
+		instance = getSetting('aiostreams.instance')
+		instances = {
+			'ElfHosted Public': 'https://aiostreams.elfhosted.com',
+			'Yeb Stable': 'https://aiostreams.fortheweak.cloud',
+			'MidnightIgnite Stable': 'https://aiostreamsfortheweebsstable.midnightignite.me'
+		}
+		base = getSetting('aiostreams.custom_url').strip().rstrip('/') if instance == 'Custom' else instances.get(instance, instances['MidnightIgnite Stable'])
 		if 'tvshowtitle' in data:
 			media_type = 'series'
 			video_id = '%s:%s:%s' % (data['imdb'], data['season'], data['episode'])
