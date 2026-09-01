@@ -64,6 +64,17 @@ class source:
 		quality, info = scrape_utils.get_release_quality(name_info, url)
 		media_info = source_utils.getFileType(name_info.lower(), url)
 		if media_info: info.extend(item.strip() for item in media_info.split('/') if item.strip())
+		service_id = (stream.get('service') or '').lower()
+		service_names = {
+			'realdebrid': 'REAL-DEBRID', 'alldebrid': 'ALLDEBRID',
+			'premiumize': 'PREMIUMIZE', 'torbox': 'TORBOX',
+			'offcloud': 'OFFCLOUD', 'easydebrid': 'EASYDEBRID',
+			'debridlink': 'DEBRID-LINK', 'putio': 'PUT.IO',
+			'pikpak': 'PIKPAK', 'seedr': 'SEEDR',
+			'debrider': 'DEBRIDER', 'easynews': 'EASYNEWS'
+		}
+		if service_id: info.append(service_names.get(service_id, service_id.replace('_', ' ').upper()))
+		if stream.get('cached') is True: info.append('CACHED')
 		size_bytes = stream.get('size') or hints.get('videoSize') or (stream.get('streamData') or {}).get('size') or 0
 		try:
 			size, size_label = scrape_utils.convert_size(float(size_bytes), to='GB')

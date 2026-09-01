@@ -1,17 +1,62 @@
-[B]Update - v6.7.86 - July 20th, 2026 [/B]
---[Fix] Add media-format and audio badges to AIOStreams results.
+[B]Update - v6.7.85 - August 19th, 2026 [/B]
+--[Fix] Fixed hosts.quality setting being used for sorting but not filtering.
+--[Change] Change made for Floppy to use end_date for Watch History sorting.
+--[Fix] Changes made for playlist creation for playnext.
 
-[B]Update - v6.7.85 - July 20th, 2026 [/B]
---[Fix] Display the originating AIOStreams add-on as the source name.
+[B]Update - v6.7.84 - August 18th, 2026 [/B]
+--[Enhancement] Added Airlock status and controls to TorBox cloud files, including fresh status after changes.
+--[Change] Removed the TorBox Delete All Cloud Files menu item.
+--[Fix] Continuous-playback dialogs now fall back to the show rating for unrated episodes.
+--[Fix] Standardized direct Progress Episode scraping, refresh, and browse actions across tracking services.
+--[Fix] MDBList completed playback no longer leaves a pause point in Progress Episodes.
+--[Fix] Reduced MDBList Progress Shows loading time by eliminating duplicate per-show metadata requests.
+--[Fix] Progress Episodes from all tracking services now show air information if turned on.
+--[Fix] Simkl Progress Episodes now advances after an episode is marked watched.
+--[Fix] Continuous playback now preserves a queued third episode at playback end.
+--[Fix] Play Random now starts a fresh continuous-playback playlist.
+--[Change] Added direct progress scrape settings for new providers. 
+--[Fix] Added support for custom lists from Floppy.
+--[Change] Success and Fail messages for add and remove from lists.
 
-[B]Update - v6.7.84 - July 20th, 2026 [/B]
---[Fix] Switched the AIOStreams preset to MidnightIgnite Stable and updated Search API result parsing.
+[B]Update - v6.7.83 - August 15th, 2026 [/B]
+--[Fix] Added guard for clearing playlist to avoid play next not working.
+--[Fix] Added thread limits to tmdb to avoid lockups on lower end devices.
+--[Change] Removed Simkl Unfinished.
 
-[B]Update - v6.7.83 - July 20th, 2026 [/B]
---[Fix] Added localized labels for AIOStreams settings.
-
-[B]Update - v6.7.82 - July 20th, 2026 [/B]
---[Change] Added AIOStreams integration with ElfHosted and custom instance support.
+[B]Update - v6.7.82 - August 13th, 2026 [/B]
+--[Change] Reorganized My TV Shows and My Movies to put lists under providers names. Ex: My TV Shows > Trakt > Progress Episodes
+--[Change] Added support for Scrob. (https://github.com/ellite/scrob)
+--[Change] Added support for Floppy. (https://github.com/dannyvfilms/Floppy)
+--[Change] Changed labels throughout providers to be consistent.
+--[Change] Added support for dropped to all calendar lists.
+--[Change] Added support for 3 digit episode numbers from manthock.
+--[Change] Management Tools Sections and Managers in context menu updated to add all available options for each provider.
+--[Change] Fixed pagination showing Next Page (None) in some instances.
+--[Change] Support for lists add from more providers.
+--[Change] Changes made to avoid double scrobbles.
+--[Change] Fixed My TV Shows and My Movies being incorrectly gated.
+--[Fix] Added pagination for user lists.
+--[Change] Made all force sync show progress dialogs.
+--[Fix] Change made for database on android 14 devices.
+--[Change] Change made to allow for sorting networks by popularity.
+--[Change] Change to playlist creation to avoid duplicate episodes.
+--[Change] MdbList Calendar added.
+--[Fix] Changes made for providers to clear cache on full history sync to avoid stale progress indicators.
+--[Change] Moved custom trakt provider behind developer options.
+--[Fix] Added pagination to MDBList History.
+--[Fix] Added progress for sync when changing watch indicators.
+--[Change] Made change so that tv and movie lists only showed up if those types of items are present in scrob user lists.
+--[Fix] Fix for resume on trakt resetting banner to 0.
+--[Fix] Fix to send separate stop event on Floppy to remove now playing banner.
+--[Fix] Runtime duration for mdblist fixed.
+--[Fix] Fix for hiding collection items from trakt.
+--[Change] Change made for Trakt scrobble on pause.
+--[Fix] Made changes to the way counts are done when using Simkl
+--[Change] Menus changed to group lists from services together. 
+--[Change] Added more mdblist lists for tv and movies like watched.
+--[Fix] Removed timestamp from Simkl scrobble. Now uses server time.
+--[Fix] Made sure scrobble fails no longer show when scrobble notifications are disabled.
+--[Fix] Change for settings reads for apple devices to fix long delays.
 
 [B]Update - v6.7.81 - July 13th, 2026 [/B]
 --[Fix] Fix to clear cache on show episode and season counts when episode count does not match cache.
