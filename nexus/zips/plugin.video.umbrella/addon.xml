@@ -1,4 +1,4 @@
-<addon id="plugin.video.umbrella" name="Umbrella" provider-name="Umbrella" version="6.7.85">
+<addon id="plugin.video.umbrella" name="Umbrella" provider-name="Umbrella" version="6.7.87">
 	<requires>
 		<import addon="xbmc.python" version="3.0.0" />
 		<import addon="script.module.requests" />
@@ -261,10 +261,11 @@
 			<screenshot>resources/screenshots/screenshot003.jpg</screenshot>
 		</assets>
 		<news>
-[B]Update - v6.7.85 - August 19th, 2026 [/B]
---[Fix] Fixed hosts.quality setting being used for sorting but not filtering.
---[Change] Change made for Floppy to use end_date for Watch History sorting.
---[Fix] Changes made for playlist creation for playnext.
+[B]Update - v6.7.87 - Sept 9th, 2026 [/B]
+--[Fix] Removed guard for scrobble in first 3 minutes so immediate stops no longer continue to show as playing.
+--[Fix] Fix for progress episodes refreshing episodes with duplicates or none.
+--[Fix] Fix for mdblist getting out of sync on multiple device environments.
+--[Fix] Reduced container refreshes to improve performance.
 		</news>
 	</extension>
 

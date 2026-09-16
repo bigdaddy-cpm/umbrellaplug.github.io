@@ -607,6 +607,9 @@ class Episodes:
 			control.sleep(200)
 			return control.refresh()
 		if url == 'mdbprogress':
+			# Refresh the local watched snapshot as well as the rendered list cache;
+			# otherwise cross-device changes remain invisible after this action.
+			mdblist.sync_watchedProgress(forced=True)
 			cache.remove(self.mdblist_progress_list, '/upnext', self.mdblist_directProgressScrape)
 			cache.remove(self.mdblist_progress_list, url, self.mdblist_directProgressScrape)
 			control.sleep(200)
@@ -819,7 +822,11 @@ class Episodes:
 	def mdblist_calendar(self, url, folderName=''):
 		self.list = []
 		try:
-			if mdblist.getWatchedActivity() > cache.timeout(self.mdblist_progress_list, url, self.mdblist_directProgressScrape):
+			activities = mdblist.getActivities()
+			if mdblist.getWatchedActivity(activities) > cache.timeout(self.mdblist_progress_list, url, self.mdblist_directProgressScrape):
+				# The progress list is reconstructed from mdbsync's local episode rows.
+				# Pull remote changes before rebuilding that cache.
+				mdblist.sync_watchedProgress(activities)
 				self.list = cache.get(self.mdblist_progress_list, 0, url, self.mdblist_directProgressScrape)
 			else:
 				self.list = cache.get(self.mdblist_progress_list, self.mdblist_hours, url, self.mdblist_directProgressScrape)
@@ -1682,34 +1689,38 @@ class Episodes:
 				if self.notifications: control.notification(title=32326, message=33049)
 
 	def scrob_progress_list(self, url='', direct=False, upcoming=False):
-		# Ported verbatim from floppy_progress_list() — Scrob's GET /history/next-up
-		# is server-computed, but doesn't carry the TMDb-enriched fields (plot/art/
-		# premiered) episodeDirectory() needs, so this still builds "next episode" the
-		# same locally-reconstructed way from the synced watched-episode set.
 		self.list = []
 		try:
-			episodes = scrobsync.get_watched_episodes()
-			if not episodes: return self.list
-			shows = {}
-			for (show_imdb, show_tmdb, show_tvdb, season, episode) in episodes:
-				shows.setdefault(show_imdb, {'imdb': show_imdb, 'tmdb': show_tmdb, 'tvdb': show_tvdb, 'watched_set': set()})
-				shows[show_imdb]['watched_set'].add((int(season), int(episode)))
-			try:
-				for (show_imdb, show_tmdb, show_tvdb, last_watched_at) in scrobsync.get_watched_shows():
-					if show_imdb in shows: shows[show_imdb]['lastplayed'] = last_watched_at
-			except: pass
-			items = list(shows.values())
+			next_up = scrob.get_next_up()
+			if not next_up: return self.list
+			items = []
+			for position, item in enumerate(next_up):
+				try:
+					show = item.get('show') or item.get('series') or {}
+					next_episode = item.get('next_episode') or item.get('episode') or item.get('media') or {}
+					if not isinstance(next_episode, dict): next_episode = {}
+					season = next_episode.get('season_number', next_episode.get('season', item.get('season_number', item.get('next_season_number'))))
+					episode = next_episode.get('episode_number', next_episode.get('number', item.get('episode_number', item.get('next_episode_number'))))
+					if season is None or episode is None: continue
+					if not self.showspecials and int(season) == 0: continue
+					tmdb_id = (show.get('tmdb_id') or show.get('tmdb') or next_episode.get('show_tmdb_id') or item.get('show_tmdb_id')
+						or item.get('series_tmdb_id') or item.get('show_tmdb') or item.get('series_tmdb'))
+					imdb_id = (show.get('imdb_id') or show.get('imdb') or next_episode.get('show_imdb_id') or item.get('show_imdb_id')
+						or item.get('series_imdb_id') or item.get('show_imdb') or item.get('series_imdb'))
+					tvdb_id = (show.get('tvdb_id') or show.get('tvdb') or next_episode.get('show_tvdb_id') or item.get('show_tvdb_id')
+						or item.get('series_tvdb_id') or item.get('show_tvdb') or item.get('series_tvdb'))
+					items.append({'imdb': str(imdb_id or ''), 'tmdb': str(tmdb_id or ''), 'tvdb': str(tvdb_id or ''),
+						'season': int(season), 'episode': int(episode),
+						'lastplayed': item.get('last_watched_at') or item.get('updated_at') or '',
+						'_scrob_position': position})
+				except: pass
 			if not items: return self.list
 
 			def items_list(i):
 				imdb_id = i.get('imdb', '')
 				tmdb_id = i.get('tmdb', '')
-				watched_set = i.get('watched_set', set())
 				try:
-					candidates = watched_set if self.showspecials else set((s, e) for (s, e) in watched_set if s != 0)
-					if not candidates: return
-					furthest_season = max(s for (s, e) in candidates)
-					furthest_episode = max(e for (s, e) in candidates if s == furthest_season)
+					next_season, next_episode = i['season'], i['episode']
 					if not tmdb_id and imdb_id:
 						tmdb_result = cache.get(tmdb_indexer().IdLookup, 96, imdb_id, i.get('tvdb', ''))
 						tmdb_id = str(tmdb_result.get('id')) if tmdb_result else ''
@@ -1717,12 +1728,7 @@ class Episodes:
 					showSeasons = cache.get(tmdb_indexer().get_showSeasons_meta, 96, tmdb_id)
 					if not showSeasons: return
 					seasons_meta = {s.get('season_number'): s for s in showSeasons.get('seasons', [])}
-					season_meta = seasons_meta.get(furthest_season)
-					if season_meta and furthest_episode < season_meta.get('episode_count', 0):
-						next_season, next_episode = furthest_season, furthest_episode + 1
-					else:
-						next_season, next_episode = furthest_season + 1, 1
-					if next_season not in seasons_meta: return  # no further known season — fully caught up
+					if next_season not in seasons_meta: return
 					seasonEpisodes = tmdb_indexer().get_seasonEpisodes_meta_checked(tmdb_id, next_season)
 					if not seasonEpisodes: return
 					episode_list = seasonEpisodes.get('episodes', [])
@@ -1779,6 +1785,7 @@ class Episodes:
 						if extended_art: values.update(extended_art)
 					if not direct: values['action'] = 'episodes'
 					values['extended'] = True
+					values['_scrob_position'] = i['_scrob_position']
 					self.list.append(values)
 				except:
 					from resources.lib.modules import log_utils
@@ -1795,17 +1802,16 @@ class Episodes:
 				batch = threads[i:i + _chunk]
 				[t.start() for t in batch]
 				[t.join() for t in batch]
+			# Restore server order before the caller applies the user's sorting and pagination.
+			# This also makes tied or missing sort values independent of worker completion order.
+			self.list.sort(key=lambda item: item['_scrob_position'])
+			for item in self.list: item.pop('_scrob_position', None)
 		except:
 			from resources.lib.modules import log_utils
 			log_utils.error()
 		return self.list
 
 	def custom_calendar_items(self, media_type='shows', days=33, start_date=None):
-		# Flat episode-reference items from Custom's /calendars/my/shows/{date}/{days},
-		# mapped into the same shape trakt_list() produces so trakt_episodes_list can
-		# enrich them with TMDb data unmodified. Confirmed schema: ShowCalendarItem =
-		# {first_aired, episode: EpisodeOut, show: ShowOut} — first_aired lives on the
-		# calendar item itself, not on the nested episode object.
 		items = []
 		try:
 			raw = customtrakt.get_calendar(media_type, days, start_date=start_date)
@@ -1847,13 +1853,6 @@ class Episodes:
 		return items
 
 	def custom_calendar_recent(self, url, folderName=''):
-		# "Recent" needs a window that actually reaches into the past — Trakt's own
-		# equivalent link (mycalendarRecent_link) requests date[30] (today minus 30
-		# days) then locally filters down to premiered<=today. custom_calendar_items()
-		# defaults to starting *today* when no start_date is given (matching Upcoming/
-		# Premieres, which correctly want a future-only window), so without an explicit
-		# override here every item in the [today, today+33] window gets thrown away by
-		# the premiered<=today filter below, leaving Recent empty.
 		self.list = []
 		try:
 			recent_start = (self.date_time - timedelta(days=30)).strftime('%Y-%m-%d')
@@ -2587,6 +2586,22 @@ class Episodes:
 
 	def episodeDirectory(self, items, unfinished=False, next=True, playlist=False, folderName=''):
 		from sys import argv # some functions like ActivateWindow() throw invalid handle less this is imported here.
+		unique_items = []
+		seen_episodes = set()
+		for episode_item in items or []:
+			try:
+				show_id = (episode_item.get('imdb') or episode_item.get('tmdb') or
+						episode_item.get('tvdb') or episode_item.get('tvshowtitle') or '')
+				episode_key = (str(show_id), str(episode_item.get('season', '')),
+						str(episode_item.get('episode', '')))
+			except AttributeError:
+				unique_items.append(episode_item)
+				continue
+			if episode_key in seen_episodes:
+				continue
+			seen_episodes.add(episode_key)
+			unique_items.append(episode_item)
+		items = unique_items
 		if self.useContainerTitles: control.setContainerName(folderName)
 		if not items: # with reuselanguageinvoker on an empty directory must be loaded, do not use sys.exit()
 			control.hide() ; control.notification(title=32326, message=33049)

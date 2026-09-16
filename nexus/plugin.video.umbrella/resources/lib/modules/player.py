@@ -29,12 +29,50 @@ from resources.lib.modules.source_utils import seas_ep_filter
 from urllib.request import urlopen, Request
 import fnmatch
 import os
+import re
+import time
 
 LOGINFO = 1
 getLS = control.lang
 getSetting = control.setting
 homeWindow = control.homeWindow
 playerWindow = control.playerWindow
+
+
+def _refresh_after_player_closes(request_id):
+	"""Refresh only after Kodi has restored the underlying window."""
+	try:
+		# used to detect when the full screen playback window has been destroyed.
+		for _ in range(20):
+			if (not control.player.isPlaying()
+					and not control.condVisibility('Window.IsActive(fullscreenvideo)')):
+				break
+			if control.monitor.waitForAbort(0.25): return
+		else:
+			log_utils.log('post-playback refresh abandoned: player window did not close', level=log_utils.LOGDEBUG)
+			return
+		for _ in range(20):
+			if 'plugin.video.umbrella' in control.infoLabel('Container.PluginName'):
+				break
+			if control.monitor.waitForAbort(0.25): return
+		else:
+			log_utils.log('post-playback container refresh skipped: Umbrella directory was not restored', level=log_utils.LOGDEBUG)
+			return
+		if control.monitor.waitForAbort(0.5): return
+		if homeWindow.getProperty('umbrella.container_refresh_request') != request_id:
+			return
+		homeWindow.clearProperty('umbrella.container_refresh_request')
+		homeWindow.clearProperty('umbrella.playback_cleanup')
+		homeWindow.clearProperty('umbrella.widget_refresh_pending')
+		log_utils.log('container.refresh issued after player window closed', level=log_utils.LOGDEBUG)
+		control.refresh()
+	except: log_utils.error()
+	finally:
+		# Do not leave refreshes disabled if Kodi aborts or never restores the
+		# directory. A newer playback request owns a different request id.
+		if homeWindow.getProperty('umbrella.container_refresh_request') == request_id:
+			homeWindow.clearProperty('umbrella.container_refresh_request')
+			homeWindow.clearProperty('umbrella.playback_cleanup')
 
 
 class Player(xbmc.Player):
@@ -638,6 +676,7 @@ class Player(xbmc.Player):
 		#control.sleep(200)
 		homeWindow.clearProperty('umbrella.window_keep_alive')
 		for i in range(0, 500):
+			if self.onPlayBackStopped_ran or self.scrobble_sent: return
 			if self.isPlayback():
 				#control.closeAll() #i cannot remember what this was for.
 				break
@@ -699,6 +738,11 @@ class Player(xbmc.Player):
 				log_utils.log('Exception trying to seekTime() offset: %s'% self.offset, level=log_utils.LOGDEBUG)
 			self.playback_resumed = True
 		if getSetting('subtitles') == 'true': Subtitles().get(self.title, self.year, self.imdb, self.season, self.episode)
+		if self.onPlayBackStopped_ran or self.scrobble_sent or not self.isPlayingVideo(): return
+		try:
+			self.current_time = self.getTime()
+			self.media_length = self.getTotalTime()
+		except: pass
 		if not self.av_started_ran:
 			self.av_started_ran = True
 			scrobble_source = getSetting('scrobble.source')
@@ -802,10 +846,24 @@ class Player(xbmc.Player):
 			if (not self.onPlayBackStopped_ran or (self.playbackStopped_triggered and not self.onPlayBackStopped_ran)) and not self.scrobble_sent: # Kodi callback unreliable and often not issued
 				self.onPlayBackStopped_ran = True
 				self.playbackStopped_triggered = False
+				# Every enabled tracking service may request a widget refresh while
+				# _sendFinishedItemState runs. Block all of them until Kodi has restored
+				# the directory; this applies equally to Custom, Trakt, Simkl, MDBList,
+				# Floppy and Scrob progress sources.
+				homeWindow.setProperty('umbrella.playback_cleanup', 'true')
 				seekable, _scrobble_source = self._sendFinishedItemState()
-				if getSetting('crefresh') == 'true' and seekable:
-					log_utils.log('container.refresh issued', level=log_utils.LOGDEBUG)
-					control.refresh() #not all skins refresh after playback stopped
+				# Never refresh from inside this callback. Kodi has not necessarily restored
+				# the underlying directory yet, so even one Container.Refresh here can reuse
+				# a closing plugin handle and produce an empty or duplicated listing.
+				if (getSetting('crefresh') == 'true' and not playnext_transition
+						and not has_next_queued):
+					request_id = str(time.time_ns())
+					homeWindow.setProperty('umbrella.container_refresh_request', request_id)
+					refresh_thread = Thread(target=_refresh_after_player_closes, args=(request_id,))
+					refresh_thread.daemon = True
+					refresh_thread.start()
+				else:
+					homeWindow.clearProperty('umbrella.playback_cleanup')
 				#control.trigger_widget_refresh() # skinshortcuts handles widget refresh
 				#control.checkforSkin(action='off')
 				try:
@@ -814,7 +872,9 @@ class Player(xbmc.Player):
 				except:
 					log_utils.error()
 				log_utils.log('onPlayBackStopped callback', level=log_utils.LOGDEBUG)
-		except: log_utils.error()
+		except:
+			homeWindow.clearProperty('umbrella.playback_cleanup')
+			log_utils.error()
 
 	def onPlayBackEnded(self):
 		try:
@@ -923,6 +983,10 @@ class Player(xbmc.Player):
 					scrob.scrobbleMovie(self.imdb, self.tmdb, pause_percent, current_time=self.getTime(), total_time=total_time)
 				else:
 					scrob.scrobbleEpisode(self.imdb, self.tmdb, self.tvdb, self.season, self.episode, pause_percent, current_time=self.getTime(), total_time=total_time)
+		except RuntimeError:
+			# Kodi may deliver the pause callback as playback is stopping, after the
+			# player has already discarded its timing state.
+			return
 		except: log_utils.error()
 
 	def onPlayBackResumed(self):
@@ -1123,10 +1187,57 @@ class Subtitles:
 		self.debuglog = control.setting('debug.level') == '1'
 		self.playnext_method = getSetting('playnext.method')
 
+	def _language_code(self, language):
+		language = (language or '').strip().lower()
+		if not language: return ''
+		# Kodi may expose a name, ISO-639-1/2 code, or a decorated stream label.
+		aliases = {'gre': 'ell', 'ger': 'deu', 'fre': 'fra', 'dut': 'nld', 'rum': 'ron', 'chi': 'zho', 'cze': 'ces', 'slo': 'slk'}
+		for value in (language, re.split(r'[^a-z]+', language)[0]):
+			try: code = xbmc.convertLanguage(value, xbmc.ISO_639_2).lower()
+			except: code = value
+			code = aliases.get(code, code)
+			if len(code) == 3: return code
+		return aliases.get(language[:3], language[:3])
+
+	def _select_embedded(self, preferred_language):
+		if getSetting('subtitles.prefer.embedded') != 'true': return False
+		preferred_code = self._language_code(preferred_language)
+		prefer_hi = getSetting('subtitles.prefer.hearing_impaired') == 'true'
+		prefer_forced = getSetting('subtitles.prefer.forced') == 'true'
+		# Some input streams report their tracks shortly after onAVStarted.
+		for attempt in range(5):
+			try: streams = xbmc.Player().getAvailableSubtitleStreams() or []
+			except: streams = []
+			matches = []
+			for index, stream in enumerate(streams):
+				if self._language_code(stream) != preferred_code: continue
+				label = str(stream).lower()
+				is_hi = any(token in label for token in ('hearing impaired', 'hearing-impaired', 'sdh', '[cc]', ' closed caption'))
+				is_forced = 'forced' in label or 'foreign parts' in label
+				score = (20 if is_hi == prefer_hi else -20) + (30 if is_forced == prefer_forced else -30)
+				matches.append((score, index))
+			if matches:
+				xbmc.Player().setSubtitleStream(max(matches)[1])
+				return True
+			if attempt < 4: control.sleep(250)
+		return False
+
+	def _subtitle_score(self, item, playing_filename):
+		filename = item.get('fileName') or ''
+		release = item.get('release') or filename
+		score = max(SequenceMatcher(None, playing_filename.lower(), filename.lower()).ratio(),
+			SequenceMatcher(None, playing_filename.lower(), release.lower()).ratio()) * 100
+		if item.get('moviehash_match'): score += 200
+		if item.get('from_trusted'): score += 20
+		score += min(float(item.get('ratings') or 0), 10) * 2
+		score += min(int(item.get('download_count') or 0), 10000) / 1000.0
+		prefer_hi = getSetting('subtitles.prefer.hearing_impaired') == 'true'
+		prefer_forced = getSetting('subtitles.prefer.forced') == 'true'
+		score += 20 if bool(item.get('hearing_impaired')) == prefer_hi else -20
+		score += 30 if bool(item.get('foreign_parts_only')) == prefer_forced else -30
+		return score
+
 	def get(self, title, year, imdb, season, episode):
-		try:
-			import re
-		except: return log_utils.error()
 		try:
 			quality = ['bluray', 'hdrip', 'brrip', 'bdrip', 'dvdrip', 'webrip', 'hdtv']
 			langs = []
@@ -1135,26 +1246,18 @@ class Subtitles:
 
 			try: subLang = xbmc.Player().getSubtitles()
 			except: subLang = ''
-			if subLang == 'gre': subLang = 'ell'
-			if subLang == langs[0]: 
+			if self._language_code(subLang) == self._language_code(langs[0]):
 				if getSetting('subtitles.notification') == 'true':
 					if Player().isPlayback():
 						control.sleep(1000)
 						control.notification(message=getLS(32393) % subLang.upper(), time=5000)
 				return log_utils.log(getLS(32393) % subLang.upper(), level=log_utils.LOGDEBUG)
-			try:
-				subLangs = xbmc.Player().getAvailableSubtitleStreams()
-				if 'gre' in subLangs: subLangs[subLangs.index('gre')] = 'ell'
-				subLang = [i for i in subLangs if i == langs[0]][0]
-			except: subLangs = subLang = ''
-			if subLangs and subLang == langs[0]:
-				control.sleep(1000)
-				xbmc.Player().setSubtitleStream(subLangs.index(subLang))
+			if self._select_embedded(langs[0]):
 				if getSetting('subtitles.notification') == 'true':
 					if Player().isPlayback():
 						control.sleep(1000)
-						control.notification(message=getLS(32394) % subLang.upper(), time=5000)
-				return log_utils.log(getLS(32394) % subLang.upper(), level=log_utils.LOGDEBUG)
+						control.notification(message=getLS(32394) % langs[0].upper(), time=5000)
+				return log_utils.log(getLS(32394) % langs[0].upper(), level=log_utils.LOGDEBUG)
 			if opensubs.Opensubs().auth():
 				log_utils.log('OpenSubs Authorized.', level=log_utils.LOGDEBUG)
 			else:
@@ -1185,12 +1288,12 @@ class Subtitles:
 				for j in result:
 					if season:
 							if seas_ep_filter(season, episode, j['fileName']):
-								seq = SequenceMatcher(None, pFileName.lower(), j['fileName'].lower())
-								matches.append({'fileName': j['fileName'], 'fileID': j['fileID'],  'ratio': seq.ratio()})
+								j['score'] = self._subtitle_score(j, pFileName)
+								matches.append(j)
 					else:
-						seq = SequenceMatcher(None, pFileName.lower(), j['fileName'].lower())
-						matches.append({'fileName': j['fileName'], 'fileID': j['fileID'], 'ratio': seq.ratio()})
-			matches.sort(key = lambda i: i['ratio'], reverse = True)
+						j['score'] = self._subtitle_score(j, pFileName)
+						matches.append(j)
+			matches.sort(key = lambda i: i['score'], reverse = True)
 
 			filter = matches
 			if not filter: 
@@ -1348,12 +1451,12 @@ class Subtitles:
 					for j in result:
 						if season:
 								if seas_ep_filter(season, episode, j['fileName']):
-									seq = SequenceMatcher(None, pFileName.lower(), j['fileName'].lower())
-									matches.append({'fileName': j['fileName'], 'fileID': j['fileID'],  'ratio': seq.ratio()})
+									j['score'] = self._subtitle_score(j, pFileName)
+									matches.append(j)
 						else:
-							seq = SequenceMatcher(None, pFileName.lower(), j['fileName'].lower())
-							matches.append({'fileName': j['fileName'], 'fileID': j['fileID'], 'ratio': seq.ratio()})
-				matches.sort(key = lambda i: i['ratio'], reverse = True)
+							j['score'] = self._subtitle_score(j, pFileName)
+							matches.append(j)
+				matches.sort(key = lambda i: i['score'], reverse = True)
 
 				filter = matches
 				if not filter: return None
@@ -1622,29 +1725,28 @@ class Bookmarks:
 		episode = episode if episode is not None else ''
 		try:
 			markwatched_percentage = int(getSetting('markwatched.percent')) or 85
-			if media_length == 0: return
-			percent = float((current_time / media_length)) * 100
+			# Closing the remote session must also work before Kodi reports a duration.
+			percent = float(current_time / media_length) * 100 if media_length > 0 else 0
 			seekable = (int(current_time) > 180 and (percent < int(markwatched_percentage)))
+			# Always close active sessions, even below the local three-minute bookmark threshold.
 			# Skip scrobble API call if item was already marked watched during playback (avoids duplicate submission)
 			skip_scrobble = already_watched and percent >= int(markwatched_percentage)
 			if service == 'simkl':
-				if not skip_scrobble and (seekable or percent >= int(markwatched_percentage)):
+				if not skip_scrobble:
 					simkl.scrobbleMovie(title, year, imdb, tmdb, percent) if media_type == 'movie' else simkl.scrobbleEpisode(tvshowtitle or title, year, imdb, tmdb, tvdb, season, episode, percent)
 				if percent >= int(markwatched_percentage): simkl.scrobbleReset(imdb, tmdb, tvdb, season, episode, refresh=False)
 			elif service == 'mdblist':
 				# Do not create a new pause bookmark immediately before clearing a
 				# completed item. If the subsequent clear is delayed or fails, that
 				# final pause point is synced back and leaves the episode in progress.
-				if not skip_scrobble and seekable:
+				if not skip_scrobble and percent < markwatched_percentage:
 					mdblist.scrobbleMovie(title, year, imdb, tmdb, percent) if media_type == 'movie' else mdblist.scrobbleEpisode(tvshowtitle or title, year, imdb, tmdb, tvdb, season, episode, percent)
 				if percent >= int(markwatched_percentage): mdblist.scrobbleReset(imdb, tmdb, tvdb, season, episode, refresh=False, already_watched=skip_scrobble)
 			elif service == 'custom':
-				if not skip_scrobble and (seekable or percent >= int(markwatched_percentage)):
+				if not skip_scrobble:
 					customtrakt.scrobbleMovie(imdb, tmdb, percent) if media_type == 'movie' else customtrakt.scrobbleEpisode(imdb, tmdb, tvdb, season, episode, percent)
 				if percent >= int(markwatched_percentage):
 					customtrakt.scrobbleReset(imdb, tmdb, tvdb, season, episode, refresh=False)
-					if not already_watched:
-						Thread(target=customtrakt.sync_watchedProgress, kwargs={'forced': True}).start()
 			elif service == 'floppy':
 				completed = percent >= int(markwatched_percentage)
 				if getSetting('debug.level') == '1':
@@ -1652,8 +1754,6 @@ class Bookmarks:
 				floppy.scrobbleStopMovie(imdb, tmdb, percent, completed=completed, current_time=current_time, total_time=media_length, already_watched=skip_scrobble) if media_type == 'movie' else floppy.scrobbleStopEpisode(imdb, tmdb, tvdb, season, episode, percent, completed=completed, current_time=current_time, total_time=media_length, already_watched=skip_scrobble)
 				if percent >= int(markwatched_percentage):
 					floppy.scrobbleReset(imdb, tmdb, tvdb, season, episode, refresh=False)
-					if not already_watched:
-						Thread(target=floppy.sync_watchedProgress, kwargs={'forced': True}).start()
 			elif service == 'scrob':
 				completed = percent >= int(markwatched_percentage)
 				if getSetting('debug.level') == '1':
@@ -1661,10 +1761,8 @@ class Bookmarks:
 				scrob.scrobbleStopMovie(imdb, tmdb, percent, completed=completed, current_time=current_time, total_time=media_length, already_watched=skip_scrobble) if media_type == 'movie' else scrob.scrobbleStopEpisode(imdb, tmdb, tvdb, season, episode, percent, completed=completed, current_time=current_time, total_time=media_length, already_watched=skip_scrobble)
 				if percent >= int(markwatched_percentage):
 					scrob.scrobbleReset(imdb, tmdb, tvdb, season, episode, refresh=False)
-					if not already_watched:
-						Thread(target=scrob.sync_watchedProgress, kwargs={'forced': True}).start()
 			else:
-				if not skip_scrobble and (seekable or percent >= int(markwatched_percentage)):
+				if not skip_scrobble:
 					trakt.scrobbleMovie(imdb, tmdb, percent) if media_type == 'movie' else trakt.scrobbleEpisode(imdb, tmdb, tvdb, season, episode, percent)
 				if percent >= int(markwatched_percentage): trakt.scrobbleReset(imdb, tmdb, tvdb, season, episode, refresh=False)
 		except:

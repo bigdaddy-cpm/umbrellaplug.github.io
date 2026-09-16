@@ -1,4 +1,4 @@
-<addon id="plugin.video.umbrella" name="Umbrella" provider-name="Umbrella" version="6.7.85">
+<addon id="plugin.video.umbrella" name="Umbrella" provider-name="Umbrella" version="6.7.92">
 	<requires>
 		<import addon="xbmc.python" version="3.0.0" />
 		<import addon="script.module.requests" />
@@ -261,10 +261,9 @@
 			<screenshot>resources/screenshots/screenshot003.jpg</screenshot>
 		</assets>
 		<news>
-[B]Update - v6.7.85 - August 19th, 2026 [/B]
---[Fix] Fixed hosts.quality setting being used for sorting but not filtering.
---[Change] Change made for Floppy to use end_date for Watch History sorting.
---[Fix] Changes made for playlist creation for playnext.
+[B]Update - v6.7.92 - September 16th, 2026 [/B]
+--[Update] Merge official Umbrella 6.7.87 changes while preserving AIOStreams integration.
+--[Fix] Preserve upstream subtitle preference labels alongside AIOStreams settings.
 		</news>
 	</extension>
 

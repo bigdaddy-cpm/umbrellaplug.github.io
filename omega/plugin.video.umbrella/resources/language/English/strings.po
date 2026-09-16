@@ -6093,25 +6093,37 @@ msgid "[COLOR %s][B]On Hold Manager - Shows[/B][/COLOR]"
 msgstr ""
 
 msgctxt "#40791"
-msgid "AIOStreams"
+msgid "Prefer embedded subtitles"
 msgstr ""
 
 msgctxt "#40792"
-msgid "Enable AIOStreams"
+msgid "Prefer hearing-impaired subtitles"
 msgstr ""
 
 msgctxt "#40793"
+msgid "Prefer forced subtitles"
+msgstr ""
+
+msgctxt "#40801"
+msgid "AIOStreams"
+msgstr ""
+
+msgctxt "#40802"
+msgid "Enable AIOStreams"
+msgstr ""
+
+msgctxt "#40803"
 msgid "AIOStreams Instance"
 msgstr ""
 
-msgctxt "#40794"
+msgctxt "#40804"
 msgid "Custom Instance URL"
 msgstr ""
 
-msgctxt "#40795"
+msgctxt "#40805"
 msgid "AIOStreams UUID"
 msgstr ""
 
-msgctxt "#40796"
+msgctxt "#40806"
 msgid "AIOStreams Password"
 msgstr ""
