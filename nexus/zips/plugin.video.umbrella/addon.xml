@@ -1,4 +1,4 @@
-<addon id="plugin.video.umbrella" name="Umbrella" provider-name="Umbrella" version="6.7.87">
+<addon id="plugin.video.umbrella" name="Umbrella" provider-name="Umbrella" version="6.7.90">
 	<requires>
 		<import addon="xbmc.python" version="3.0.0" />
 		<import addon="script.module.requests" />
@@ -103,6 +103,15 @@
 				<label>$INFO[Window(home).Property(context.umbrella.showUmbrella)]Scrob Manager</label>
 				<visible>
 					!String.IsEmpty(Window(home).Property(context.umbrella.scrobManager)) +
+					String.StartsWith(ListItem.path,plugin://plugin.video.umbrella/) +
+					String.IsEqual(ListItem.Property(isUmbrella_widget),true) +
+					[String.IsEqual(ListItem.dbtype,episode) | String.IsEqual(ListItem.dbtype,tvshow) | String.IsEqual(ListItem.dbtype,season) | String.IsEqual(ListItem.dbtype,movie)]
+				</visible>
+			</item>
+			<item library="resources\lib\context\punchplayManager.py">
+				<label>$INFO[Window(home).Property(context.umbrella.showUmbrella)]PunchPlay Manager</label>
+				<visible>
+					!String.IsEmpty(Window(home).Property(context.umbrella.punchplayManager)) +
 					String.StartsWith(ListItem.path,plugin://plugin.video.umbrella/) +
 					String.IsEqual(ListItem.Property(isUmbrella_widget),true) +
 					[String.IsEqual(ListItem.dbtype,episode) | String.IsEqual(ListItem.dbtype,tvshow) | String.IsEqual(ListItem.dbtype,season) | String.IsEqual(ListItem.dbtype,movie)]
@@ -261,11 +270,9 @@
 			<screenshot>resources/screenshots/screenshot003.jpg</screenshot>
 		</assets>
 		<news>
-[B]Update - v6.7.87 - Sept 9th, 2026 [/B]
---[Fix] Removed guard for scrobble in first 3 minutes so immediate stops no longer continue to show as playing.
---[Fix] Fix for progress episodes refreshing episodes with duplicates or none.
---[Fix] Fix for mdblist getting out of sync on multiple device environments.
---[Fix] Reduced container refreshes to improve performance.
+[B]Update - v6.7.90 - Sept 25th, 2026 [/B]
+--[Fix] Fixed redundant per-show requests during SIMKL season sync by reusing batch responses. Sync should be much faster.
+--[Fix] Changes made for when scrobble is set to local to allow for items to still be marked as watched with online services.
 		</news>
 	</extension>
 
