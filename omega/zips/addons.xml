@@ -1,5 +1,5 @@
 <?xml version='1.0' encoding='utf-8'?>
-<addons><addon id="plugin.video.umbrella" name="Umbrella" provider-name="Umbrella" version="6.7.96">
+<addons><addon id="plugin.video.umbrella" name="Umbrella" provider-name="Umbrella" version="6.7.97">
 	<requires>
 		<import addon="xbmc.python" version="3.0.0" />
 		<import addon="script.module.requests" />
@@ -271,9 +271,9 @@
 			<screenshot>resources/screenshots/screenshot003.jpg</screenshot>
 		</assets>
 		<news>
-[B]Update - v6.7.93 - September 26th, 2026 [/B]
---[Update] Merge official Umbrella 6.7.90 changes while preserving AIOStreams integration.
---[Fix] Preserve PunchPlay and Skip Intro labels alongside AIOStreams settings.
+[B]Update - v6.7.97 - October 16th, 2026 [/B]
+--[Update] Merge official Umbrella 6.7.91 and 6.7.92: SIMKL sync fixes, service scheduling, season pack preferences, subtitle handling, and automatic intro/recap skipping.
+--[Fix] Preserve AIOStreams integration, source details, and anime episode-group fallback with original-numbering retry.
 		</news>
 	</extension>
 

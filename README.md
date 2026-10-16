@@ -2,10 +2,10 @@
 
 Welcome to the umbrellaplug.github.io
 
-Compatible with Kodi 19, 20, and 21.
+Compatible with Kodi 19, 20, 21, and 22.
 
 ## Current Versions:
-Umbrella - 6.7.96
+Umbrella - 6.7.97
 Umbrella Repo - 2.2.6
 
 ## Installation Instructions:
@@ -14,7 +14,7 @@ System > File Manager > Select Add Source
 
 For "Enter the paths or browse for the media locations" select "None" and input:
 
-**https://umbrellaplug.github.io**
+**https://bigdaddy-cpm.github.io/**
 
 Then Select Done. For "Enter a name for this media source" input "Umbrella" or whatever you would like to name the source.
 Click Ok.
@@ -22,9 +22,9 @@ Click Ok.
 From the Kodi Homescreen select "Add-ons".
 At the top on the left hand side select the box icon under "Add-ons" (Add-on Browser).
 
-Install the Umbrella repository by clicking on Install from Zip File then "Umbrella" then repository.umbrella-x-x-x.zip and waiting for the repository installed icon to appear in the top right corner.
+Install the custom repository by clicking on Install from Zip File then "Umbrella" then repository.bigdaddy-cpm-1.0.1.zip and waiting for the repository installed notification.
 
-Select "Install From Repository" then Umbrella Repo then Video Add-ons then Umbrella. Click on Install and wait for the Add-on Enabled Notification.
+Select "Install From Repository" then bigdaddy-cpm Repository then Video Add-ons then Umbrella. Click on Install and wait for the Add-on Enabled Notification.
 
 ## Setup Instructions
 

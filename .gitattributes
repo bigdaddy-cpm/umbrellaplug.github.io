@@ -1,0 +1,3 @@
+# Repository checksums must describe the exact bytes GitHub serves.
+/omega/zips/addons.xml -text
+/omega/zips/addons.xml.md5 -text
