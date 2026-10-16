@@ -2273,6 +2273,11 @@
 					</dependencies>
 					<control type="toggle"/>
 				</setting>
+				<setting id="anime.seasons.episode.group.fallback" type="boolean" label="40836" help="40837">
+					<level>0</level>
+					<default>false</default>
+					<control type="toggle"/>
+				</setting>
 				<setting id="sources.useTitleSubsList" type="action" label="40240" help="" parent="sources.useTitleSubs">
 					<level>0</level>
 					<data>RunPlugin(plugin://plugin.video.umbrella/?action=tools_subsList)</data>

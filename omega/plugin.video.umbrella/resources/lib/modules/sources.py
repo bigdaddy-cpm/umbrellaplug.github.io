@@ -13,6 +13,7 @@ from urllib.parse import unquote, quote_plus
 from sqlite3 import dbapi2 as database
 from resources.lib.database import metacache, providerscache
 from resources.lib.modules import cleandate
+from resources.lib.modules import client
 from resources.lib.modules import control
 from resources.lib.modules import debrid
 from resources.lib.modules import log_utils
@@ -64,6 +65,43 @@ class Sources:
 		self.external_module = getSetting('external_provider.module')
 		self.isHidden = getSetting('progress.dialog') == '4'
 		self.useTitleSubs = getSetting('sources.useTitleSubs') == 'true'
+
+	def _anime_episode_group_remap(self, tmdb, season, episode):
+		"""Return TMDb episode-group numbering for scraping, without changing playback metadata."""
+		if getSetting('anime.seasons.episode.group.fallback') != 'true' or not tmdb:
+			return season, episode
+		try:
+			api_key = getSetting('tmdb.apikey') or 'edde6b5e41246ab79a2697cd125e1781'
+			base_url = 'https://api.themoviedb.org/3'
+			keywords = jsloads(client.request('%s/tv/%s/keywords?api_key=%s' % (base_url, tmdb, api_key), timeout=10) or '{}')
+			if 210024 not in [int(item.get('id', 0)) for item in keywords.get('results', [])]:
+				return season, episode
+
+			groups = jsloads(client.request('%s/tv/%s/episode_groups?api_key=%s' % (base_url, tmdb, api_key), timeout=10) or '{}').get('results', [])
+			if not groups:
+				return season, episode
+			group = next((item for item in groups if (item.get('name') or '').strip().lower() == 'seasons'), None)
+			if group is None:
+				group = next((item for item in groups if int(item.get('type', 0)) == 1), None)
+			if group is None:
+				return season, episode
+
+			episode_data = jsloads(client.request('%s/tv/%s/season/%s/episode/%s?api_key=%s' % (base_url, tmdb, season, episode, api_key), timeout=10) or '{}')
+			episode_id = int(episode_data.get('id', 0))
+			if not episode_id:
+				return season, episode
+			details = jsloads(client.request('%s/tv/episode_group/%s?api_key=%s' % (base_url, group.get('id'), api_key), timeout=10) or '{}')
+			for season_group in details.get('groups', []):
+				for item in season_group.get('episodes', []):
+					if int(item.get('id', 0)) == episode_id:
+						mapped_season = str(season_group.get('order'))
+						mapped_episode = str(int(item.get('order', 0)) + 1)
+						if (mapped_season, mapped_episode) != (str(season), str(episode)):
+							log_utils.log('Anime episode-group fallback: TMDb %s S%sE%s -> %s S%sE%s' % (tmdb, season, episode, group.get('name'), mapped_season, mapped_episode), level=log_utils.LOGINFO)
+						return mapped_season, mapped_episode
+		except Exception as exc:
+			log_utils.log('Anime episode-group fallback failed: %s' % exc, level=log_utils.LOGWARNING)
+		return season, episode
 
 	def play(self, title, year, imdb, tmdb, tvdb, season, episode, tvshowtitle, premiered, meta, select, rescrape=None):
 		if not self.prem_providers:
@@ -531,6 +569,9 @@ class Sources:
 
 	def getSources(self, title, year, imdb, tmdb, tvdb, season, episode, tvshowtitle, premiered, meta=None, preScrape=False):
 		self.window = None
+		if tvshowtitle is not None:
+			self.original_scrape_season, self.original_scrape_episode = str(season), str(episode)
+			season, episode = self._anime_episode_group_remap(tmdb, season, episode)
 		if preScrape:
 			self.isPrescrape = True
 			if tvshowtitle is not None:
@@ -571,6 +612,8 @@ class Sources:
 					alias = {'title': tvshowtitle + ' ' + i, 'country': i.lower()}
 					if not alias in aliases: aliases.append(alias)
 			data = {'title': title, 'year': year, 'imdb': imdb, 'tvdb': tvdb, 'season': season, 'episode': episode, 'tvshowtitle': tvshowtitle, 'aliases': aliases, 'premiered': premiered}
+			if (getattr(self, 'original_scrape_season', str(season)), getattr(self, 'original_scrape_episode', str(episode))) != (str(season), str(episode)):
+				data.update({'original_season': self.original_scrape_season, 'original_episode': self.original_scrape_episode})
 			if self.debrid_service: data.update({'debrid_service': self.debrid_service, 'debrid_token': self.debrid_token})
 			for i in scraperDict:
 				name, pack = i[0].upper(), i[2]
@@ -690,6 +733,8 @@ class Sources:
 						if not alias in aliases: aliases.append(alias)
 				aliases = aliases_check(tvshowtitle, aliases)
 				data = {'title': title, 'year': year, 'imdb': imdb, 'tvdb': tvdb, 'season': season, 'episode': episode, 'tvshowtitle': tvshowtitle, 'aliases': aliases, 'premiered': premiered}
+				if (getattr(self, 'original_scrape_season', str(season)), getattr(self, 'original_scrape_episode', str(episode))) != (str(season), str(episode)):
+					data.update({'original_season': self.original_scrape_season, 'original_episode': self.original_scrape_episode})
 				if self.debrid_service: data.update({'debrid_service': self.debrid_service, 'debrid_token': self.debrid_token})
 				for i in scraperDict:
 					name, pack = i[0].upper(), i[2]

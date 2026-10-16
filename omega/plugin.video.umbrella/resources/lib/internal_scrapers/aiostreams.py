@@ -22,19 +22,34 @@ class source:
 
 	def sources(self, data, hostDict):
 		if not data or not data.get('imdb'): return []
-		try:
-			url, params = self._search_request(data)
-			response = requests.get(url, params=params, auth=(getSetting('aiostreams.uuid').strip(), getSetting('aiostreams.password')), headers={'User-Agent': 'Umbrella/AIOStreams'}, timeout=30)
-			response.raise_for_status()
-			payload = response.json()
-			if not payload.get('success'): raise ValueError((payload.get('error') or {}).get('message') or 'AIOStreams search failed')
-			streams = (payload.get('data') or {}).get('results', [])
-			return [item for item in (self._convert(stream) for stream in streams) if item]
-		except Exception:
-			log_utils.error('AIOStreams request failed: ')
-			return []
+		variants = [('primary', data.get('season'), data.get('episode'))]
+		original = (data.get('original_season'), data.get('original_episode'))
+		if all(value is not None for value in original) and original != variants[0][1:]:
+			variants.append(('original', original[0], original[1]))
+		credentials = (getSetting('aiostreams.uuid').strip(), getSetting('aiostreams.password'))
+		for label, season, episode in variants:
+			try:
+				url, params = self._search_request(data, season, episode)
+				response = requests.get(url, params=params, auth=credentials, headers={'User-Agent': 'Umbrella/AIOStreams'}, timeout=30)
+				response.raise_for_status()
+				payload = response.json()
+				if not payload.get('success'): raise ValueError((payload.get('error') or {}).get('message') or 'AIOStreams search failed')
+				streams = (payload.get('data') or {}).get('results', [])
+				converted = [item for item in (self._convert(stream) for stream in streams) if item]
+				unique = []
+				seen = set()
+				for item in converted:
+					key = item.get('url') or item.get('name')
+					if key in seen: continue
+					seen.add(key)
+					unique.append(item)
+				log_utils.log('AIOStreams %s search %s: %d raw, %d playable' % (label, params.get('id'), len(streams), len(unique)), level=log_utils.LOGINFO)
+				if unique: return unique
+			except Exception:
+				log_utils.error('AIOStreams %s request failed: ' % label)
+		return []
 
-	def _search_request(self, data):
+	def _search_request(self, data, season=None, episode=None):
 		instance = getSetting('aiostreams.instance')
 		instances = {
 			'ElfHosted Public': 'https://aiostreams.elfhosted.com',
@@ -44,7 +59,7 @@ class source:
 		base = getSetting('aiostreams.custom_url').strip().rstrip('/') if instance == 'Custom' else instances.get(instance, instances['MidnightIgnite Stable'])
 		if 'tvshowtitle' in data:
 			media_type = 'series'
-			video_id = '%s:%s:%s' % (data['imdb'], data['season'], data['episode'])
+			video_id = '%s:%s:%s' % (data['imdb'], season if season is not None else data['season'], episode if episode is not None else data['episode'])
 		else:
 			media_type = 'movie'
 			video_id = data['imdb']

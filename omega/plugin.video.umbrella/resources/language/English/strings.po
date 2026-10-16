@@ -6219,3 +6219,11 @@ msgstr ""
 msgctxt "#40835"
 msgid "AIOStreams Password"
 msgstr ""
+
+msgctxt "#40836"
+msgid "Anime \"Seasons\" Episode Group Fallback"
+msgstr ""
+
+msgctxt "#40837"
+msgid "For anime, use TMDb's Seasons episode group for source matching when available; otherwise use Original Air Date. Playback and watched metadata keep their original numbering."
+msgstr ""
