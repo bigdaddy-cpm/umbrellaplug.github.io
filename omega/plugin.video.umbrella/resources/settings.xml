@@ -1298,6 +1298,8 @@
 							<option label="35029">0</option>
 							<option label="35028">1</option>
 							<option label="35030">2</option>
+							<option label="40842">3</option>
+							<option label="40843">4</option>
 						</options>
 					</constraints>
 					<dependencies>
@@ -1323,6 +1325,7 @@
 							<and>
 								<condition operator="is" setting="tvshows.air.enabled">true</condition>
 								<condition operator="!is" setting="tvshows.air.format">0</condition>
+								<condition operator="!is" setting="tvshows.air.format">3</condition>
 							</and>
 						</dependency>
 					</dependencies>
@@ -1343,6 +1346,7 @@
 							<and>
 								<condition operator="is" setting="tvshows.air.enabled">true</condition>
 								<condition operator="!is" setting="tvshows.air.format">1</condition>
+								<condition operator="!is" setting="tvshows.air.format">3</condition>
 							</and>
 						</dependency>
 					</dependencies>
@@ -2283,7 +2287,7 @@
 					</dependencies>
 					<control type="toggle"/>
 				</setting>
-				<setting id="anime.seasons.episode.group.fallback" type="boolean" label="40836" help="40837">
+				<setting id="anime.seasons.episode.group.fallback" type="boolean" label="40906" help="40907">
 					<level>0</level>
 					<default>false</default>
 					<control type="toggle"/>
@@ -4666,33 +4670,33 @@
 			</group>
 		</category>
 		<category id="Providers" label="40362" help="40191">
-			<group id="aiostreams" label="40830">
-				<setting id="aiostreams.enable" type="boolean" label="40831" help="">
+			<group id="aiostreams" label="40900">
+				<setting id="aiostreams.enable" type="boolean" label="40901" help="">
 					<level>0</level>
 					<default>false</default>
 					<control type="toggle"/>
 				</setting>
-				<setting id="aiostreams.instance" type="string" label="40832" help="" parent="aiostreams.enable">
+				<setting id="aiostreams.instance" type="string" label="40902" help="" parent="aiostreams.enable">
 					<level>0</level>
 					<default>MidnightIgnite Stable</default>
 					<constraints><options><option>ElfHosted Public</option><option>Yeb Stable</option><option>MidnightIgnite Stable</option><option>Custom</option></options></constraints>
 					<dependencies><dependency type="visible"><condition operator="is" setting="aiostreams.enable">true</condition></dependency></dependencies>
-					<control type="list" format="string"><heading>40832</heading></control>
+					<control type="list" format="string"><heading>40902</heading></control>
 				</setting>
-				<setting id="aiostreams.custom_url" type="string" label="40833" help="" parent="aiostreams.enable">
+				<setting id="aiostreams.custom_url" type="string" label="40903" help="" parent="aiostreams.enable">
 					<level>0</level><default/><constraints><allowempty>true</allowempty></constraints>
 					<dependencies><dependency type="visible"><and><condition operator="is" setting="aiostreams.enable">true</condition><condition operator="is" setting="aiostreams.instance">Custom</condition></and></dependency></dependencies>
-					<control type="edit" format="string"><heading>40833</heading></control>
+					<control type="edit" format="string"><heading>40903</heading></control>
 				</setting>
-				<setting id="aiostreams.uuid" type="string" label="40834" help="" parent="aiostreams.enable">
+				<setting id="aiostreams.uuid" type="string" label="40904" help="" parent="aiostreams.enable">
 					<level>0</level><default/><constraints><allowempty>true</allowempty></constraints>
 					<dependencies><dependency type="visible"><condition operator="is" setting="aiostreams.enable">true</condition></dependency></dependencies>
-					<control type="edit" format="string"><heading>40834</heading></control>
+					<control type="edit" format="string"><heading>40904</heading></control>
 				</setting>
-				<setting id="aiostreams.password" type="string" label="40835" help="" parent="aiostreams.enable">
+				<setting id="aiostreams.password" type="string" label="40905" help="" parent="aiostreams.enable">
 					<level>0</level><default/><constraints><allowempty>true</allowempty></constraints>
 					<dependencies><dependency type="visible"><condition operator="is" setting="aiostreams.enable">true</condition></dependency></dependencies>
-					<control type="edit" format="string"><heading>40835</heading><hidden>true</hidden></control>
+					<control type="edit" format="string"><heading>40905</heading><hidden>true</hidden></control>
 				</setting>
 				<setting id="aiostreams.priority" type="integer" label="40005" help="">
 					<level>0</level>

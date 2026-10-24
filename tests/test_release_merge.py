@@ -58,7 +58,7 @@ class ReleaseStructure(unittest.TestCase):
 
     def test_no_new_duplicate_localization_ids(self):
         for target in ('matrix', 'nexus', 'omega', 'piers'):
-            path = ROOT / target / 'plugin.video.umbrella/resources/language/English/strings.po'
+            path = ROOT / target / 'plugin.video.umbrella/resources/language/resource.language.en_gb/strings.po'
             ids = re.findall(r'^msgctxt "#(\d+)"', path.read_text(encoding='utf-8'), re.M)
             # Upstream already repeats 30021; custom and newly merged IDs must be unique.
             self.assertFalse([key for key, count in Counter(ids).items()
@@ -67,14 +67,15 @@ class ReleaseStructure(unittest.TestCase):
     def test_settings_and_labels(self):
         settings = ET.parse(ADDON / 'resources/settings.xml')
         nodes = {node.attrib['id']: node for node in settings.findall('.//setting')}
-        text = (ADDON / 'resources/language/English/strings.po').read_text(encoding='utf-8')
+        text = (ADDON / 'resources/language/resource.language.en_gb/strings.po').read_text(encoding='utf-8')
         labels = dict(re.findall(r'msgctxt "#(\d+)"\s+msgid "(.*)"', text))
         for setting in ('aiostreams.enable', 'aiostreams.instance', 'aiostreams.uuid',
                         'aiostreams.password', 'anime.seasons.episode.group.fallback'):
             self.assertTrue(labels[nodes[setting].attrib['label']])
         self.assertEqual(nodes['anime.seasons.episode.group.fallback'].findtext('default'), 'false')
         for key, expected in {'40824': 'Automatically skip intro', '40826': 'Automatically skip recap',
-                              '40828': 'Shared service options', '40830': 'AIOStreams'}.items():
+                              '40828': 'Shared service options', '40830': 'Export Settings',
+                              '40900': 'AIOStreams'}.items():
             self.assertEqual(labels[key], expected)
         self.assertEqual(nodes['aiostreams.password'].findtext('control/hidden'), 'true')
 

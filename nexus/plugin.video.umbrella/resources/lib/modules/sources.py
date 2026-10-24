@@ -18,6 +18,7 @@ from resources.lib.modules import debrid
 from resources.lib.modules import log_utils
 from resources.lib.modules import string_tools
 from resources.lib.modules import source_preferences
+from resources.lib.modules.playback_metadata import normalize as normalize_playback_meta
 from resources.lib.modules.source_utils import supported_video_extensions, getFileType, aliases_check
 from resources.lib.cloud_scrapers import cloudSources
 from resources.lib.internal_scrapers import internalSources
@@ -36,9 +37,23 @@ internal_scrapers_clouds_list = [('realdebrid', 'rd_cloud', 'rd'), ('premiumize'
 def _natural_sort_key(value):
 	return [int(part) if part.isdigit() else part.lower() for part in re.split(r'(\d+)', value or '')]
 
+def _write_provider_cache(cursor, query, values):
+	"""Provider cache writes are optional; freshly scraped results are not."""
+	if cursor is None: return False
+	try:
+		cursor.execute(query, values)
+		cursor.connection.commit()
+		return True
+	except database.Error as exc:
+		try: cursor.connection.rollback()
+		except database.Error: pass
+		log_utils.log('Provider cache write skipped: %s' % exc, level=log_utils.LOGWARNING)
+		return False
+
 class Sources:
 	def __init__(self, all_providers=False, custom_query=False, filterless_scrape=False, rescrapeAll=False):
 		self.sources = []
+		self.url = None
 		self.scraper_sources = []
 		self.uncached_chosen = False
 		self.isPrescrape = False
@@ -67,6 +82,9 @@ class Sources:
 		self.useTitleSubs = getSetting('sources.useTitleSubs') == 'true'
 
 	def play(self, title, year, imdb, tmdb, tvdb, season, episode, tvshowtitle, premiered, meta, select, rescrape=None):
+		# Keep the route identity even when resolution fails after source selection.
+		self.playback_request = dict(title=title, year=year, imdb=imdb, tmdb=tmdb, tvdb=tvdb,
+			season=season, episode=episode, tvshowtitle=tvshowtitle, premiered=premiered)
 		force_selection = select == '0' or rescrape == 'true'
 		if not self.prem_providers:
 			control.sleep(200) ; control.hide()
@@ -94,8 +112,11 @@ class Sources:
 				playerWindow.clearProperty('umbrella.preResolved_tmdb')
 				if _match:
 					control.sleep(500)
-					try: meta = jsloads(unquote(meta.replace('%22', '\\"')))
-					except: pass
+					meta = normalize_playback_meta(meta, title=title, year=year, imdb=imdb, tmdb=tmdb,
+						tvdb=tvdb, season=season, episode=episode, tvshowtitle=tvshowtitle,
+						premiered=premiered, mediatype='movie' if tvshowtitle is None else 'episode')
+					self.meta = meta
+					homeWindow.setProperty(self.metaProperty, jsdumps(meta))
 					if self.debuglog:
 						log_utils.log('Playing preResolved_nextUrl = %s' % preResolved_nextUrl, level=log_utils.LOGDEBUG)
 					from resources.lib.modules import player
@@ -106,7 +127,7 @@ class Sources:
 			if title: title = self.getTitle(title)
 			if tvshowtitle: tvshowtitle = self.getTitle(tvshowtitle)
 			homeWindow.clearProperty(self.metaProperty)
-			homeWindow.setProperty(self.metaProperty, meta)
+			homeWindow.setProperty(self.metaProperty, jsdumps(normalize_playback_meta(meta)))
 			homeWindow.clearProperty(self.seasonProperty)
 			homeWindow.setProperty(self.seasonProperty, season)
 			homeWindow.clearProperty(self.episodeProperty)
@@ -208,7 +229,12 @@ class Sources:
 					log_utils.error()
 					meta = {}
 			if self.meta is None or 'videodb' in control.infoLabel('ListItem.FolderPath'):
-				self.meta = checkLibMeta()
+				self.meta = checkLibMeta() or meta
+			self.meta = normalize_playback_meta(self.meta, title=title, year=year, imdb=imdb, tmdb=tmdb,
+				tvdb=tvdb, season=season, episode=episode, tvshowtitle=tvshowtitle,
+				premiered=premiered, mediatype=self.mediatype)
+			meta = self.meta
+			homeWindow.setProperty(self.metaProperty, jsdumps(meta))
 			if self.mediatype == 'movie':
 				if getSetting('imdb.Moviemeta.check') == 'true': # check IMDB. TMDB and Trakt differ on a ratio of 1 in 20 and year is off by 1, some meta titles mismatch
 					title, year = self.imdb_meta_chk(imdb, title, year)
@@ -935,6 +961,7 @@ class Sources:
 			dbcur.close() ; dbcon.close()
 
 	def getMovieSource(self, imdb, data, source, call):
+		dbcur = None
 		try:
 			dbcon = database.connect(sourceFile, timeout=60)
 			dbcon.execute('''PRAGMA page_size = 32768''')
@@ -965,9 +992,8 @@ class Sources:
 			if sources:
 				self.scraper_sources.extend(sources)
 				if source != 'aiostreams':
-					dbcur.execute('''INSERT OR REPLACE INTO rel_aliases Values (?, ?)''', (data.get('title', ''), repr(data.get('aliases', ''))))
-					dbcur.execute('''INSERT OR REPLACE INTO rel_src Values (?, ?, ?, ?, ?, ?)''', (source, imdb, '', '', repr(sources), datetime.now().strftime("%Y-%m-%d %H:%M:%S.%f")))
-					dbcur.connection.commit()
+					_write_provider_cache(dbcur, '''INSERT OR REPLACE INTO rel_aliases Values (?, ?)''', (data.get('title', ''), repr(data.get('aliases', ''))))
+					_write_provider_cache(dbcur, '''INSERT OR REPLACE INTO rel_src Values (?, ?, ?, ?, ?, ?)''', (source, imdb, '', '', repr(sources), datetime.now().strftime("%Y-%m-%d %H:%M:%S.%f")))
 		except: log_utils.error()
 
 	def getEpisodeSource(self, imdb, season, episode, data, source, call, pack):
@@ -980,6 +1006,7 @@ class Sources:
 
 	def _getEpisodeSource(self, imdb, season, episode, data, source, call, pack):
 		from resources.lib.modules.episode_mapping import tag_sources
+		dbcur = None
 		try:
 			dbcon = database.connect(sourceFile, timeout=60)
 			dbcon.execute('''PRAGMA page_size = 32768''')
@@ -1029,18 +1056,13 @@ class Sources:
 						return self.scraper_sources.extend(tag_sources(sources, data))
 			except: log_utils.error()
 
-		try: #dummy write or threads wait till return from scrapers...write for each is needed
-			dbcur.execute('''INSERT OR REPLACE INTO rel_src Values (?, ?, ?, ?, ?, ?)''', ('dummy write', '', '', '', '', ''))
-			dbcur.connection.commit()
-		except: log_utils.error()
 		if not pack: # singleEpisodes scraper call
 			try:
 				sources = []
 				sources = call().sources(data, self.hostprDict)
 				if sources:
 					if source != 'aiostreams':
-						dbcur.execute('''INSERT OR REPLACE INTO rel_src Values (?, ?, ?, ?, ?, ?)''', (source, imdb, season, episode, repr(sources), datetime.now().strftime("%Y-%m-%d %H:%M:%S.%f")))
-						dbcur.connection.commit()
+						_write_provider_cache(dbcur, '''INSERT OR REPLACE INTO rel_src Values (?, ?, ?, ?, ?, ?)''', (source, imdb, season, episode, repr(sources), datetime.now().strftime("%Y-%m-%d %H:%M:%S.%f")))
 					return self.scraper_sources.extend(tag_sources(sources, data))
 				return
 			except: return log_utils.error()
@@ -1049,8 +1071,7 @@ class Sources:
 				sources = []
 				sources = call().sources_packs(data, self.hostprDict, bypass_filter=self.dev_disable_season_filter)
 				if sources:
-					dbcur.execute('''INSERT OR REPLACE INTO rel_src Values (?, ?, ?, ?, ?, ?)''', (source, imdb, season,'', repr(sources), datetime.now().strftime("%Y-%m-%d %H:%M:%S.%f")))
-					dbcur.connection.commit()
+					_write_provider_cache(dbcur, '''INSERT OR REPLACE INTO rel_src Values (?, ?, ?, ?, ?, ?)''', (source, imdb, season,'', repr(sources), datetime.now().strftime("%Y-%m-%d %H:%M:%S.%f")))
 					sources = [i for i in sources if not 'episode_start' in i or i['episode_start'] <= int(episode) <= i['episode_end']] # filter out range items that do not apply to current episode for return
 					return self.scraper_sources.extend(tag_sources(sources, data))
 				return
@@ -1060,8 +1081,7 @@ class Sources:
 				sources = []
 				sources = call().sources_packs(data, self.hostprDict, search_series=True, total_seasons=data.get('_scrape_total_seasons', self.total_seasons), bypass_filter=self.dev_disable_show_filter)
 				if sources:
-					dbcur.execute('''INSERT OR REPLACE INTO rel_src Values (?, ?, ?, ?, ?, ?)''', (source, imdb, '', '', repr(sources), datetime.now().strftime("%Y-%m-%d %H:%M:%S.%f")))
-					dbcur.connection.commit()
+					_write_provider_cache(dbcur, '''INSERT OR REPLACE INTO rel_src Values (?, ?, ?, ?, ?, ?)''', (source, imdb, '', '', repr(sources), datetime.now().strftime("%Y-%m-%d %H:%M:%S.%f")))
 					sources = [i for i in sources if i.get('last_season') >= int(season)] # filter out range items that do not apply to current season for return
 					return self.scraper_sources.extend(tag_sources(sources, data))
 			except: log_utils.error()
@@ -1077,7 +1097,7 @@ class Sources:
 				except: log_utils.error()
 			if getSetting('source.filtermbysize') == '2':
 				try:
-					duration = self.meta['duration'] or 5400
+					duration = self.meta.get('duration') or 5400
 					max_size = (0.125 * (0.90 * float(getSetting('source.movie.linespeed', '20'))) * duration)/1000
 					self.sources = [i for i in self.sources if (i.get('size', 0) <= max_size)]
 				except: log_utils.error()
@@ -1098,7 +1118,7 @@ class Sources:
 				except: log_utils.error()
 			if getSetting('source.filterebysize') == '2':
 				try:
-					duration = self.meta['duration'] or 2400
+					duration = self.meta.get('duration') or 2400
 					max_size = (0.125 * (0.90 * float(getSetting('source.episode.linespeed', '20'))) * duration)/1000
 					self.sources = [i for i in self.sources if (i.get('size', 0) <= max_size)]
 				except: log_utils.error()
@@ -1533,7 +1553,8 @@ class Sources:
 						from resources.lib.debrid.torbox import TorBox as debrid_function
 					else: return
 					
-					url = debrid_function().resolve_magnet(url, item['hash'], season, episode, title)
+					premiered = meta.get('premiered') or meta.get('firstaired') if isinstance(meta, dict) else None
+					url = debrid_function().resolve_magnet(url, item['hash'], season, episode, title, premiered=premiered)
 					self.url = url
 					return url
 				except:
@@ -1644,7 +1665,7 @@ class Sources:
 			release_title = chosen_result['filename']
 			control.hide()
 			from resources.lib.modules import source_utils
-			if source_utils.seas_ep_filter(season, episode, release_title):
+			if source_utils.seas_ep_filter(season, episode, release_title, premiered=meta.get('premiered') or meta.get('firstaired')):
 				return player.Player().play_source(title, year, season, episode, imdb, tmdb, tvdb, self.url, meta, debridPackCall=True) # hack fix for setResolvedUrl issue
 			else:
 				return player.Player().play(self.url)
@@ -1730,11 +1751,23 @@ class Sources:
 
 	def errorForSources(self,title=None, year=None, imdb=None, tmdb=None, tvdb=None, season=None, episode=None, tvshowtitle=None, premiered=None):
 		try:
-			
+			request = getattr(self, 'playback_request', {})
+			title = title if title is not None else request.get('title')
+			year = year if year is not None else request.get('year')
+			imdb = imdb if imdb is not None else request.get('imdb')
+			tmdb = tmdb if tmdb is not None else request.get('tmdb')
+			tvdb = tvdb if tvdb is not None else request.get('tvdb')
+			season = season if season is not None else request.get('season')
+			episode = episode if episode is not None else request.get('episode')
+			tvshowtitle = tvshowtitle if tvshowtitle is not None else request.get('tvshowtitle')
+			premiered = premiered if premiered is not None else request.get('premiered')
+			if not title or (tvshowtitle and (season is None or episode is None)):
+				control.notification(message=32401)
+				return control.cancelPlayback()
 			homeWindow.clearProperty('umbrella.window_keep_alive')
 			control.sleep(200)
 			control.hide()
-			if self.url == 'close://': control.notification(message=32400)
+			if getattr(self, 'url', None) == 'close://': control.notification(message=32400)
 			elif self.retryallsources:
 				if self.rescrapeAll == 'true':
 					control.notification(message=32401)

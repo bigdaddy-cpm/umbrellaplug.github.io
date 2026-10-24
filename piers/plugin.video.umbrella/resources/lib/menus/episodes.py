@@ -16,6 +16,7 @@ from resources.lib.modules import cleangenre
 from resources.lib.modules import client
 from resources.lib.modules import control
 from resources.lib.modules import tools
+from resources.lib.modules.air_labels import date_label
 from resources.lib.modules import trakt
 from resources.lib.modules import simkl
 from resources.lib.modules import mdblist
@@ -1879,8 +1880,9 @@ class Episodes:
 	def scrob_progress_list(self, url='', direct=False, upcoming=False):
 		self.list = []
 		try:
-			next_up = scrob.get_next_up()
-			if not next_up: return self.list
+			# The server's Next Up feed excludes unaired episodes. Build upcoming
+			# candidates from synced history instead, retaining TMDb show identity.
+			next_up = [] if upcoming else scrob.get_next_up()
 			items = []
 			for position, item in enumerate(next_up):
 				try:
@@ -1902,13 +1904,23 @@ class Episodes:
 						'lastplayed': item.get('last_watched_at') or item.get('updated_at') or '',
 						'_scrob_position': position})
 				except: pass
+			if upcoming:
+				shows = {}
+				for imdb, tmdb, tvdb, season, episode in scrobsync.get_watched_episodes():
+					if not tmdb: continue
+					show = shows.setdefault(str(tmdb), {'imdb': imdb, 'tmdb': str(tmdb), 'tvdb': tvdb, 'watched_set': set()})
+					if self.showspecials or int(season) != 0:
+						show['watched_set'].add((int(season), int(episode)))
+				lastplayed = {str(r[1]): r[3] for r in scrobsync.get_watched_shows()}
+				items = [dict(show, lastplayed=lastplayed.get(tmdb, ''), _scrob_position=position)
+					for position, (tmdb, show) in enumerate(shows.items()) if show['watched_set']]
 			if not items: return self.list
 
 			def items_list(i):
 				imdb_id = i.get('imdb', '')
 				tmdb_id = i.get('tmdb', '')
 				try:
-					next_season, next_episode = i['season'], i['episode']
+					next_season, next_episode = i.get('season'), i.get('episode')
 					if not tmdb_id and imdb_id:
 						tmdb_result = cache.get(tmdb_indexer().IdLookup, 96, imdb_id, i.get('tvdb', ''))
 						tmdb_id = str(tmdb_result.get('id')) if tmdb_result else ''
@@ -1916,6 +1928,15 @@ class Episodes:
 					showSeasons = cache.get(tmdb_indexer().get_showSeasons_meta, 96, tmdb_id)
 					if not showSeasons: return
 					seasons_meta = {s.get('season_number'): s for s in showSeasons.get('seasons', [])}
+					if upcoming:
+						season, episode = max(i['watched_set'])
+						season_meta = seasons_meta.get(season) or {}
+						if episode < (season_meta.get('episode_count') or 0):
+							next_season, next_episode = season, episode + 1
+						else:
+							following = sorted(s for s in seasons_meta if s is not None and s > season)
+							if not following: return
+							next_season, next_episode = following[0], 1
 					if next_season not in seasons_meta: return
 					seasonEpisodes = tmdb_indexer().get_seasonEpisodes_meta_checked(tmdb_id, next_season)
 					if not seasonEpisodes: return
@@ -3118,10 +3139,11 @@ class Episodes:
 				try: meta.update({'title': i['label']})
 				except: pass
 				if airEnabled == 'true':
+					airdate_label = date_label(meta, airFormat == '4', airZone, airFormatDay == '1', airFormatTime, tools.convert_time) if airFormat in ('3', '4') else ''
 					air = [] ; airday = None ; airtime = None
 					if 'airday' in meta and not meta['airday'] is None and meta['airday'] != '': 
 						airday = meta['airday']
-					if 'airtime' in meta and not meta['airtime'] is None and meta['airtime'] != '':
+					if airFormat not in ('3', '4') and 'airtime' in meta and not meta['airtime'] is None and meta['airtime'] != '':
 						airtime = meta['airtime']
 						if 'airzone' in meta and not meta['airzone'] is None and meta['airzone'] != '':
 							if airZone == '1': zoneTo = meta['airzone']
@@ -3135,8 +3157,9 @@ class Episodes:
 							if airday: airday, airtime = airtime[1], airtime[0]
 					if airday: air.append(airday)
 					if airtime: air.append(airtime)
-					if len(air) > 0:
-						if airFormat == '0': air = airtime
+					if airdate_label or (airFormat not in ('3', '4') and len(air) > 0):
+						if airFormat in ('3', '4'): air = airdate_label
+						elif airFormat == '0': air = airtime
 						elif airFormat == '1': air = airday
 						elif airFormat == '2': air = air = ' '.join(air)
 						#if airLocation == '0' or airLocation == '1': air = '[COLOR skyblue][%s][/COLOR]' % air

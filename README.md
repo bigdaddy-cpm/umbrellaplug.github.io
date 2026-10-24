@@ -5,8 +5,15 @@ Welcome to the umbrellaplug.github.io
 Compatible with Kodi 19, 20, 21, and 22.
 
 ## Current Versions:
-Umbrella - 6.7.97
+Umbrella - 6.7.98 (custom; upstream 6.7.97)
 Umbrella Repo - 2.2.6
+
+The October 23 custom release incorporates upstream through commit
+`82e91dda01a72d51fe1988cbe61cef1c5d2d78a7`. It retains AIOStreams, source details,
+anime episode-group mapping, and original-numbering retries. Custom setting
+labels use IDs 40900–40907 in Kodi's `resource.language.en_gb` folder.
+Settings backups include AIOStreams connection details only when that account
+is explicitly selected for export; ordinary preference backups omit them.
 
 ## Installation Instructions:
 From Kodi:
