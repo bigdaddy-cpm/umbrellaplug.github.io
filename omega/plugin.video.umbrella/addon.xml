@@ -1,4 +1,4 @@
-<addon id="plugin.video.umbrella" name="Umbrella" provider-name="Umbrella" version="6.7.98">
+<addon id="plugin.video.umbrella" name="Umbrella" provider-name="Umbrella" version="6.7.99">
 	<requires>
 		<import addon="xbmc.python" version="3.0.0" />
 		<import addon="script.module.requests" />
@@ -270,10 +270,9 @@
 			<screenshot>resources/screenshots/screenshot003.jpg</screenshot>
 		</assets>
 		<news>
-[B]Custom update - v6.7.98 - October 23rd, 2026 [/B]
---[Update] Merge official Umbrella through 6.7.97, including Kodi 22, Play Next, resume, debrid and cache fixes.
---[Fix] Preserve AIOStreams source details, anime remapping with original-numbering retry, and native playback metadata.
---[Fix] Move custom setting labels to a separate range and retain them in Kodi 22 language folders.
+[B]Custom update - v6.7.99 - October 28th, 2026 [/B]
+--[Update] Merge official Umbrella 6.7.98: Trakt authentication, airdate scraper matching and Premiumize refresh fixes.
+--[Preserve] AIOStreams, anime episode mapping, source details and custom settings backups.
 		</news>
 	</extension>
 

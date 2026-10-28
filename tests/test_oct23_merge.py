@@ -124,7 +124,7 @@ class Kodi22Integration(unittest.TestCase):
         self.assertEqual(normalizer.normalize('not JSON', season=1, episode=29)['episode'], 29)
 
     def test_release_version_exceeds_published_custom_release(self):
-        self.assertEqual(ET.parse(ADDON / 'addon.xml').getroot().attrib['version'], '6.7.98')
+        self.assertEqual(ET.parse(ADDON / 'addon.xml').getroot().attrib['version'], '6.7.99')
 
 
 if __name__ == '__main__':

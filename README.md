@@ -5,11 +5,11 @@ Welcome to the umbrellaplug.github.io
 Compatible with Kodi 19, 20, 21, and 22.
 
 ## Current Versions:
-Umbrella - 6.7.98 (custom; upstream 6.7.97)
+Umbrella - 6.7.99 (custom; upstream 6.7.98)
 Umbrella Repo - 2.2.6
 
-The October 23 custom release incorporates upstream through commit
-`82e91dda01a72d51fe1988cbe61cef1c5d2d78a7`. It retains AIOStreams, source details,
+The October 28 custom release incorporates upstream through commit
+`824096eb1a349b177688b5c147ac3d59abdf4c56`. It retains AIOStreams, source details,
 anime episode-group mapping, and original-numbering retries. Custom setting
 labels use IDs 40900–40907 in Kodi's `resource.language.en_gb` folder.
 Settings backups include AIOStreams connection details only when that account
@@ -64,9 +64,8 @@ Umbrella uses AIOStreams' authenticated Search API to request movie and episode 
 Please do not mention any other addons in issues.
 
 ## Logs
-Enable Logs: Go to Umbrella settings and select Debugging on the left hand side.
-Set your settings like this:
-![Screen Sho](https://user-images.githubusercontent.com/107957815/177895894-eb3f68cb-cd83-4d05-b033-6588579f2ce5.png)
+Information about what how to set up logging and what is needed can be found here:
+https://github.com/umbrellaplug/umbrellaplug.github.io/discussions/649
 
 ## FAQ
 
